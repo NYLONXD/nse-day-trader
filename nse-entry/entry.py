@@ -170,6 +170,7 @@ def evaluate(sym, series, now, cutoff, cfg, cal, overrides, setup="orb", level=N
     entry = M.clean_price(trig.c, tick)
     nxt = [b for b in ordered if b.t > trig.t]
     out = dict(base, status="triggered", trigger_bar=M.fmt_time(trig.t), trigger_time=M.fmt_time(M.bar_end(trig.t)),
+               min_volume_x=min_volume_x,
                entry_price=entry, over_pct=round((entry / lvl - 1) * 100, 2),
                volume_ratio=(lambda r: r and round(r, 2))(orb.volume_ratio(bars, trig)),
                next_bar_open=nxt and M.clean_price(nxt[0].o, tick) or None,

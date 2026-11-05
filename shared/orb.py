@@ -140,3 +140,78 @@ def load_watchlist(path):
         e["band_raw"] = band_raw(h.get("band"))
         out[M.normalize_symbol(h["symbol"])] = e
     return out
+
+
+# ------------------------------------------------------------------ stop and target rules
+# Used by nse-exit (today's plan) and nse-timemachine (the same rule on past days).
+
+ATR_BARS = 14
+STOP_RULES = {"or-mid": False, "or-low": False, "price": True, "pct": True, "atr": True}
+TARGET_RULES = {"r": True, "price": True, "pct": True}
+
+
+class RuleError(ValueError):
+    pass
+
+
+def parse_rule(text, kinds, what):
+    """'pct:0.8' -> ('pct', 0.8); 'or-mid' -> ('or-mid', None)."""
+    t = str(text).strip().lower()
+    if kinds.get(t) is False:
+        return t, None
+    if ":" in t:
+        k, _, v = t.partition(":")
+        if kinds.get(k) is True:
+            try:
+                x = float(v)
+            except ValueError:
+                raise RuleError("%s %r: the number after ':' is not a number" % (what, text))
+            if x <= 0:
+                raise RuleError("%s %r: the number must be above 0" % (what, text))
+            return k, x
+    raise RuleError("%s must be one of %s (got %r)" % (
+        what, ", ".join(k + ("" if v is False else ":X") for k, v in kinds.items()), text))
+
+
+def atr(bars, n=ATR_BARS):
+    """(average true range, bars used) over the last n of one session's bars. The first
+    bar's range is high-low, so the overnight gap does not count."""
+    trs, prev = [], None
+    for b in bars:
+        trs.append(b.h - b.l if prev is None else max(b.h - b.l, abs(b.h - prev), abs(b.l - prev)))
+        prev = b.c
+    use = trs[-n:]
+    return sum(use) / len(use), len(use)
+
+
+def raw_stop(rule, entry, or_high=None, or_low=None, tick=None, bars_to_trigger=None):
+    """(raw stop price before tick rounding, plain why, note or None)."""
+    kind, x = parse_rule(rule, STOP_RULES, "--stop")
+    t = float(tick if tick is not None else M.TICK_DEFAULT)
+    if kind in ("or-mid", "or-low"):
+        if or_high is None or or_low is None:
+            raise RuleError("%s needs the opening range high and low" % kind)
+        if kind == "or-mid":
+            mid = (or_high + or_low) / 2
+            return mid, "opening-range midpoint %s" % M.fmt_number(mid), None
+        return or_low - t, "one tick under the opening-range low %s" % M.fmt_number(or_low), None
+    if kind == "price":
+        return x, "your price", None
+    if kind == "pct":
+        return entry * (1 - x / 100), "%g%% under the entry" % x, None
+    if not bars_to_trigger:
+        raise RuleError("atr:K needs the session's bars up to the trigger bar")
+    a, n = atr(bars_to_trigger)
+    note = ("ATR averaged the %d bars of the session so far (fewer than %d)." % (n, ATR_BARS)
+            if n < ATR_BARS else None)
+    return entry - x * a, "%g x ATR %s, over %d five-minute bars to the trigger bar" % (x, M.fmt_number(a), n), note
+
+
+def raw_target(rule, entry, risk):
+    """(raw target price before tick rounding, plain why)."""
+    kind, x = parse_rule(rule, TARGET_RULES, "--target")
+    if kind == "r":
+        return entry + x * risk, "%g x the risk a share" % x
+    if kind == "price":
+        return x, "your price"
+    return entry * (1 + x / 100), "%g%% over the entry" % x

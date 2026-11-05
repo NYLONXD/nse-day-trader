@@ -91,5 +91,22 @@ class Skills(unittest.TestCase):
             self.assertIn("test_%s.py" % skill.split("-", 1)[1], names, skill)
 
 
+class Python38(unittest.TestCase):
+    """The syntax test (feature_version 3.8) cannot see library calls added in 3.9+."""
+    NEWER = re.compile(r"removeprefix|removesuffix|zoneinfo|functools\.cache\b|math\.lcm|is_relative_to|"
+                       r"randbytes|\}\s*\|\s*\{|:\s*(list|dict|tuple|set)\[")
+
+    def test_no_39_plus_library_calls(self):
+        for folder, _, files in os.walk(ROOT):
+            if any(p in folder for p in (".git", "reference", "__pycache__")):
+                continue
+            for name in files:
+                if name.endswith(".py") and name != "test_repo.py":
+                    path = os.path.join(folder, name)
+                    with open(path, encoding="utf-8") as f:
+                        for n, line in enumerate(f, 1):
+                            self.assertIsNone(self.NEWER.search(line), "%s:%d %s" % (path, n, line.strip()))
+
+
 if __name__ == "__main__":
     unittest.main()

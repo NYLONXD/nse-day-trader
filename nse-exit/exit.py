@@ -32,7 +32,6 @@ import yahoo   # noqa: E402
 
 M = market
 MIN_STOP_TICKS = 2
-ATR_BARS = 14
 NOT_A_GUARANTEE = ("The stop is a plan, not a guarantee: a gap, a fast market or a circuit lock "
                    "can fill you worse than the stop, or not at all.")
 
@@ -52,41 +51,6 @@ def write_json(path, doc):
         json.dump(doc, f, indent=1, ensure_ascii=False)
         f.write("\n")
     os.replace(tmp, path)
-
-
-def parse_rule(text, kinds, what):
-    """'pct:0.8' -> ('pct', 0.8); 'or-mid' -> ('or-mid', None)."""
-    t = str(text).strip().lower()
-    if t in kinds and kinds[t] is False:
-        return t, None
-    if ":" in t:
-        k, _, v = t.partition(":")
-        if kinds.get(k) is True:
-            try:
-                x = float(v)
-            except ValueError:
-                raise PlanError("%s %r: the number after ':' is not a number" % (what, text))
-            if x <= 0:
-                raise PlanError("%s %r: the number must be above 0" % (what, text))
-            return k, x
-    raise PlanError("%s must be one of %s (got %r)" % (
-        what, ", ".join(k + ("" if v is False else ":X") for k, v in kinds.items()), text))
-
-
-STOPS = {"or-mid": False, "or-low": False, "price": True, "pct": True, "atr": True}
-TARGETS = {"r": True, "price": True, "pct": True}
-
-
-def atr(bars):
-    """(average true range, bars used) over the last ATR_BARS of `bars` (one session; the
-    first bar's range is high-low, so the overnight gap does not count)."""
-    trs, prev = [], None
-    for b in bars:
-        tr = b.h - b.l if prev is None else max(b.h - b.l, abs(b.h - prev), abs(b.l - prev))
-        trs.append(tr)
-        prev = b.c
-    use = trs[-ATR_BARS:]
-    return sum(use) / len(use), len(use)
 
 
 def session_bars_to(entry, offline):
@@ -115,27 +79,15 @@ def build_plan(entry, stop_rule, target_rule, cfg, offline=None):
     tick = entry.get("tick") or float(M.TICK_DEFAULT)
     e = M.clean_price(entry["entry_price"], tick)
     notes = []
-    kind, x = parse_rule(stop_rule, STOPS, "--stop")
-    if kind in ("or-mid", "or-low"):
-        if entry.get("or_high") is None or entry.get("or_low") is None:
-            raise PlanError("%s needs the opening range: run /nse-entry first or pass --or-high and --or-low" % kind)
-        hi, lo = entry["or_high"], entry["or_low"]
-        if kind == "or-mid":
-            raw, why = (hi + lo) / 2, "opening-range midpoint %s" % M.fmt_number((hi + lo) / 2)
-        else:
-            raw, why = lo - tick, "one tick under the opening-range low %s" % M.fmt_number(lo)
-    elif kind == "price":
-        raw, why = x, "your price"
-    elif kind == "pct":
-        raw, why = e * (1 - x / 100), "%g%% under the entry" % x
-    else:
+    kind, x = orb.parse_rule(stop_rule, orb.STOP_RULES, "--stop")
+    bars = None
+    if kind == "atr":
         if not entry.get("trigger_bar") or not entry.get("session"):
             raise PlanError("atr:K needs the trigger bar from trader/entry.json")
-        a, n = atr(session_bars_to(entry, offline))
-        raw = e - x * a
-        why = "%g x ATR %s, over %d five-minute bars to the trigger bar" % (x, M.fmt_number(a), n)
-        if n < ATR_BARS:
-            notes.append("ATR averaged the %d bars of the session so far (fewer than %d)." % (n, ATR_BARS))
+        bars = session_bars_to(entry, offline)
+    raw, why, note = orb.raw_stop(stop_rule, e, entry.get("or_high"), entry.get("or_low"), tick, bars)
+    if note:
+        notes.append(note)
     if raw >= e:
         raise PlanError("the stop %s (%s) is at or above the entry %s: a long's stop must be below it. "
                         "Pick a lower stop (or-low, pct:X)." % (M.fmt_number(raw), why, M.fmt_number(e)))
@@ -144,13 +96,7 @@ def build_plan(entry, stop_rule, target_rule, cfg, offline=None):
         raise PlanError("the stop %s is within %d ticks of the entry %s: ordinary noise would hit it. "
                         "Pick a wider stop." % (M.fmt_number(stop), MIN_STOP_TICKS, M.fmt_number(e)))
     risk = round(e - stop, 2)
-    tkind, tx = parse_rule(target_rule, TARGETS, "--target")
-    if tkind == "r":
-        traw, twhy = e + tx * risk, "%g x the risk a share" % tx
-    elif tkind == "price":
-        traw, twhy = tx, "your price"
-    else:
-        traw, twhy = e * (1 + tx / 100), "%g%% over the entry" % tx
+    traw, twhy = orb.raw_target(target_rule, e, risk)
     target = M.target_price(traw, tick)
     if target <= e:
         raise PlanError("the target %s is at or below the entry %s. Pick a higher target." % (
@@ -186,6 +132,8 @@ def build_plan(entry, stop_rule, target_rule, cfg, offline=None):
             "flat_by": cfg["flat_by"], "no_entries_after": cfg["no_entries_after"],
             "min_reward_risk": cfg["min_reward_risk"], "tick": tick, "limits": limits,
             "or_high": entry.get("or_high"), "or_low": entry.get("or_low"),
+            "setup": entry.get("setup", "orb"), "level": entry.get("level"),
+            "trigger_bar": entry.get("trigger_bar"), "min_volume_x": entry.get("min_volume_x"),
             "notes": notes, "stop_is_a_plan": NOT_A_GUARANTEE}
 
 
@@ -277,7 +225,7 @@ def main(argv=None):
         return 2
     try:
         return cmd_plan(a)
-    except (PlanError, M.MarketError, yahoo.DataError, config.ConfigError) as e:
+    except (PlanError, orb.RuleError, M.MarketError, yahoo.DataError, config.ConfigError) as e:
         print(json.dumps({"error": str(e)}) if a.json else "Refused: %s" % e)
         return 1
 

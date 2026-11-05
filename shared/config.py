@@ -18,6 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
+import costs   # noqa: E402
 import market  # noqa: E402
 
 DEFAULTS = {
@@ -30,6 +31,7 @@ DEFAULTS = {
     "min_reward_risk": 1.5,                # target distance / stop distance, at least this
     "min_price_inr": 50,                   # scanner: skip stocks below this price
     "min_traded_value_inr": 100000000,     # scanner: median daily traded value, Rs. 10 cr
+    "costs": costs.DEFAULT_COSTS,          # PLACEHOLDER rates: put your broker's real ones here
 }
 
 POSITIVE_NUMBERS = ("max_loss_per_trade_inr", "daily_loss_limit_inr", "max_trades_per_day",
@@ -60,6 +62,10 @@ def check(cfg):
         probs.append("min_price_inr must be a number, 0 or more (got %r)" % (v,))
     if not isinstance(cfg["max_trades_per_day"], int) or isinstance(cfg["max_trades_per_day"], bool):
         probs.append("max_trades_per_day must be a whole number")
+    if not isinstance(cfg["costs"], dict):
+        probs.append("costs must be an object of rates (see shared/costs.py)")
+    else:
+        probs.extend(costs.check(cfg["costs"]))
     if cfg["paper"] is not True:
         probs.append("paper must be true: v1 is paper/simulation only")
     if (isinstance(cfg["daily_loss_limit_inr"], (int, float)) and isinstance(cfg["max_loss_per_trade_inr"], (int, float))
@@ -87,6 +93,9 @@ def load(path=None):
                 continue
             if k not in DEFAULTS:
                 warnings.append("unknown setting %r in %s (a typo?) is ignored" % (k, path))
+                continue
+            if k == "costs" and isinstance(v, dict):
+                cfg[k] = dict(cfg[k], **v)     # change one rate, keep the others
                 continue
             cfg[k] = v
     probs = check(cfg)
