@@ -13,5 +13,5 @@ One phase at a time. Each phase: build, run tests, show results, commit, wait fo
   - [ ] **You:** replace the placeholder cost rates in `trader/config.json` with your broker's (pricing page + a real contract note).
 - [x] **Phase 5 — nse-budget and nse-risk.** Sizing net of costs and slippage (shared/costs.py, also used by the Time Machine), no leverage; 25-line risk gate with fingerprint; shared/journal.py (today's entries, fresh prices).
   - [ ] **You:** put your own capital and limits in `trader/config.json` (`python shared/config.py init`).
-- [ ] **Phase 6 — nse-alerts and nse-broker** (ticket only, never calls a broker).
+- [x] **Phase 6 — nse-alerts and nse-broker.** Alerts: quote -> prices.json, price/time alerts on completed bars, plan stop/target pair (OCO-style), bells. Broker: ticket only behind the risk fingerprint (today, <=15 min, in window), SL-M/SL and OCO-or-alert target with the no-two-resting-sells warning, capped limit, paper journal (placed/closed/flatten/status). Code-level test: no network, no secrets.
 - [ ] **Phase 7 — README, plugin manifests, full test run.**
