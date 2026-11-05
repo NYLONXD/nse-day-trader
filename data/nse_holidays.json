@@ -7,8 +7,86 @@
     "5. Only when that year's list is complete, add the year to 'years_covered'. Until then every date in that year is refused.",
     "Later circulars (an added holiday, a Muhurat time) must be added by hand too."
   ],
-  "years_covered": [],
-  "source": {},
-  "holidays": [],
-  "special_sessions": []
+  "years_covered": [
+    2026
+  ],
+  "source": {
+    "2026": "NOT YET CONFIRMED AGAINST NSE'S CIRCULAR. Copied on 2026-11-05 from broker pages that agree with each other (Upstox, Bajaj Broking; 15 Jan also on Angel One, HDFC Sky, Kotak) and matched to real Yahoo data (14 Sep, 2 Oct, 20 Oct had no bars). Replace this text with NSE's 'Trading Holidays for the calendar year 2026' circular reference number and date."
+  },
+  "holidays": [
+    {
+      "date": "2026-01-15",
+      "name": "Municipal Corporation Election - Maharashtra"
+    },
+    {
+      "date": "2026-01-26",
+      "name": "Republic Day"
+    },
+    {
+      "date": "2026-03-03",
+      "name": "Holi"
+    },
+    {
+      "date": "2026-03-26",
+      "name": "Shri Ram Navami"
+    },
+    {
+      "date": "2026-03-31",
+      "name": "Shri Mahavir Jayanti"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday"
+    },
+    {
+      "date": "2026-04-14",
+      "name": "Dr. Baba Saheb Ambedkar Jayanti"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Maharashtra Day"
+    },
+    {
+      "date": "2026-05-28",
+      "name": "Bakri Id"
+    },
+    {
+      "date": "2026-06-26",
+      "name": "Muharram"
+    },
+    {
+      "date": "2026-09-14",
+      "name": "Ganesh Chaturthi"
+    },
+    {
+      "date": "2026-10-02",
+      "name": "Mahatma Gandhi Jayanti"
+    },
+    {
+      "date": "2026-10-20",
+      "name": "Dussehra"
+    },
+    {
+      "date": "2026-11-10",
+      "name": "Diwali-Balipratipada"
+    },
+    {
+      "date": "2026-11-24",
+      "name": "Prakash Gurpurb Sri Guru Nanak Dev"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas"
+    }
+  ],
+  "special_sessions": [
+    {
+      "date": "2026-02-01",
+      "name": "Union Budget special live session (Sunday)"
+    },
+    {
+      "date": "2026-11-08",
+      "name": "Diwali Laxmi Pujan Muhurat trading (Sunday)"
+    }
+  ]
 }
