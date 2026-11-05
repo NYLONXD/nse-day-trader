@@ -5,6 +5,8 @@ Market rules (session hours, ticks, holidays) are NOT settings; they live in mar
 
   python shared/config.py init    # writes trader/config.json with every default, if missing
   python shared/config.py show    # prints the settings in force and any problems
+  python shared/config.py lists   # copies the empty holiday and tick-size lists into trader/,
+                                  # where they survive plugin updates (fill them from NSE)
 
 The trader/ folder is in the current directory (where you run Claude), or $NSE_TRADER_DIR.
 """
@@ -50,7 +52,7 @@ class ConfigError(ValueError):
 
 
 def trader_dir():
-    return os.environ.get("NSE_TRADER_DIR") or "trader"
+    return market.trader_dir()
 
 
 def config_path():
@@ -145,6 +147,17 @@ def main(argv=None):
         made, path = init()
         print(("Wrote %s with the defaults." if made else "%s already exists; left as is.") % path)
         return 0
+    if cmd == "lists":
+        import shutil
+        for name, src in (("nse_holidays.json", market.HOLIDAYS_FILE), ("nse_tick_sizes.json", market.TICKS_FILE)):
+            dst = os.path.join(trader_dir(), name)
+            if os.path.exists(dst):
+                print("%s already exists; left as is." % dst)
+                continue
+            os.makedirs(trader_dir(), exist_ok=True)
+            shutil.copyfile(src, dst)
+            print("Wrote %s: fill it from NSE (the steps are inside). It wins over %s." % (dst, src))
+        return 0
     if cmd == "show":
         try:
             cfg, warnings = load()
@@ -155,7 +168,7 @@ def main(argv=None):
             print("Warning: " + w)
         print(json.dumps(cfg, indent=2))
         return 0
-    print("usage: config.py init | show")
+    print("usage: config.py init | show | lists")
     return 2
 
 

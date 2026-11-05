@@ -30,6 +30,20 @@ from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR, ROUND_HALF_EVEN, ROUND_
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
+def trader_dir():
+    """Your working folder: trader/ in the current directory, or $NSE_TRADER_DIR."""
+    return os.environ.get("NSE_TRADER_DIR") or "trader"
+
+
+def user_file(name, env, packaged):
+    """Where a file you fill lives. Order: $env, then trader/<name> (your project: survives
+    plugin updates), then the copy shipped in this repo's data/ folder."""
+    if os.environ.get(env):
+        return os.environ[env]
+    mine = os.path.join(trader_dir(), name)
+    return mine if os.path.exists(mine) else packaged
+
 # ------------------------------------------------------------------ time
 
 IST = _dt.timezone(_dt.timedelta(hours=5, minutes=30), "IST")
@@ -262,8 +276,8 @@ class Calendar(object):
 
 def load_calendar(path=None):
     """Read and check the holidays file. Raises MarketError with one plain line if it is wrong.
-    Path order: the argument, then $NSE_HOLIDAYS_FILE, then data/nse_holidays.json."""
-    path = path or os.environ.get("NSE_HOLIDAYS_FILE") or HOLIDAYS_FILE
+    Path order: the argument, $NSE_HOLIDAYS_FILE, trader/nse_holidays.json, data/nse_holidays.json."""
+    path = path or user_file("nse_holidays.json", "NSE_HOLIDAYS_FILE", HOLIDAYS_FILE)
     try:
         with open(path, encoding="utf-8") as f:
             doc = json.load(f)
@@ -400,8 +414,9 @@ def infer_tick(prices, min_samples=TICK_MIN_SAMPLES):
 
 def load_tick_overrides(path=None):
     """{"RELIANCE.NS": Decimal("0.10"), ...} from the tick file the user fills. A missing file
-    is fine (empty). Path order: the argument, $NSE_TICK_SIZES_FILE, data/nse_tick_sizes.json."""
-    path = path or os.environ.get("NSE_TICK_SIZES_FILE") or TICKS_FILE
+    is fine (empty). Path order: the argument, $NSE_TICK_SIZES_FILE, trader/nse_tick_sizes.json,
+    data/nse_tick_sizes.json."""
+    path = path or user_file("nse_tick_sizes.json", "NSE_TICK_SIZES_FILE", TICKS_FILE)
     if not os.path.exists(path):
         return {}
     try:

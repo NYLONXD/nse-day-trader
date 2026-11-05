@@ -69,7 +69,7 @@ per day and duplicates. It lives in `trader/state/journal-YYYY-MM-DD.json`.
 
 1. After `/nse-risk` PASSES: `ticket.py ticket`. Read the ticket to the user, step by step.
 2. Say plainly: nothing was sent anywhere; they place it by hand in their own broker app, or skip it.
-   Say once that most retail intraday traders lose money.
+   Say the Safety line below once.
 3. When they say they bought: `placed --price P` (their real fill). Then `/nse-alerts from-plan` and `watch`.
 4. When they say they sold: `closed SYMBOL --price P --reason stop|target|flat_by|manual`, and remind
    them to cancel any order still resting for that stock.

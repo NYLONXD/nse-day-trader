@@ -14,4 +14,11 @@ One phase at a time. Each phase: build, run tests, show results, commit, wait fo
 - [x] **Phase 5 — nse-budget and nse-risk.** Sizing net of costs and slippage (shared/costs.py, also used by the Time Machine), no leverage; 25-line risk gate with fingerprint; shared/journal.py (today's entries, fresh prices).
   - [ ] **You:** put your own capital and limits in `trader/config.json` (`python shared/config.py init`).
 - [x] **Phase 6 — nse-alerts and nse-broker.** Alerts: quote -> prices.json, price/time alerts on completed bars, plan stop/target pair (OCO-style), bells. Broker: ticket only behind the risk fingerprint (today, <=15 min, in window), SL-M/SL and OCO-or-alert target with the no-two-resting-sells warning, capped limit, paper journal (placed/closed/flatten/status). Code-level test: no network, no secrets.
-- [ ] **Phase 7 — README, plugin manifests, full test run.**
+- [x] **Phase 7 — README, plugin manifests, full test run.** README (install, first-time setup, real example day, data lessons, how to extend, credits), MIT LICENSE, .claude-plugin/plugin.json + marketplace.json (`claude plugin validate .` passes), tools/example_day.py (all eight skills end to end), trader/ copies of the holiday and tick lists win over the plugin's, 196 tests pass.
+
+## Your to-do list (none of it is code)
+- [ ] Fill the NSE holiday list for 2026 (and 2027 when NSE publishes it): `data/nse_holidays.json`, or `trader/nse_holidays.json` for a plugin install (`python shared/config.py lists`).
+- [ ] `python shared/config.py init`, then your own capital and limits in `trader/config.json`.
+- [ ] Your broker's real cost rates in `trader/config.json` -> `costs` (check them against a contract note).
+- [ ] Once during market hours: `python tools/probe_yahoo.py --no-save` to measure Yahoo's delay.
+- [ ] After you create the GitHub repo and push: add `homepage` and `repository` to `.claude-plugin/plugin.json` (README, Install section).

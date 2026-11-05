@@ -111,9 +111,11 @@ def build_plan(entry, stop_rule, target_rule, cfg, offline=None):
             notes.append("The stop %s is below today's lower circuit limit %s: no trade can happen below it, "
                          "and in a lower-circuit lock you may not be able to sell at all."
                          % (M.fmt_number(stop), M.fmt_number(limits["lower"])))
+    elif entry.get("band") == "No Band":
+        notes.append("No fixed price band (an F&O stock): no circuit limit applies to the target.")
     else:
-        notes.append("Circuit limits unknown (band %s); the target was not checked against them."
-                     % entry.get("band", "unknown"))
+        notes.append("Circuit limits unknown (band unknown); the target was not checked against them. "
+                     "/nse-scanner daily finds the band.")
     reward = round(target - e, 2)
     rr = round(reward / risk, 2)
     if rr < cfg["min_reward_risk"]:
@@ -131,6 +133,7 @@ def build_plan(entry, stop_rule, target_rule, cfg, offline=None):
             "risk_pct": round(risk / e * 100, 2),
             "flat_by": cfg["flat_by"], "no_entries_after": cfg["no_entries_after"],
             "min_reward_risk": cfg["min_reward_risk"], "tick": tick, "limits": limits,
+            "band": entry.get("band", "unknown"),
             "or_high": entry.get("or_high"), "or_low": entry.get("or_low"),
             "setup": entry.get("setup", "orb"), "level": entry.get("level"),
             "trigger_bar": entry.get("trigger_bar"), "min_volume_x": entry.get("min_volume_x"),

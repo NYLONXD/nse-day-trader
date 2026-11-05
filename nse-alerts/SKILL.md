@@ -81,4 +81,5 @@ time, and never rings on a closed day.
 ## Safety
 
 Paper and simulation only. Education and tooling, not financial advice. Yahoo bars can be late: an
-alert can ring after the price has moved on. Every stop is a plan, not a guarantee.
+alert can ring after the price has moved on. Every stop is a plan, not a guarantee. Most retail
+intraday traders lose money.

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "nse-day-trader",
+  "description": "NSE (India) intraday toolkit for Claude: paper trading only, long only.",
+  "owner": {
+    "name": "Himanshu Jha",
+    "email": "himanshujha202005@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "nse-day-trader",
+      "description": "Eight skills for an NSE intraday day: nse-scanner, nse-entry, nse-exit, nse-timemachine, nse-budget, nse-risk, nse-alerts, nse-broker (ticket only). Paper only.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

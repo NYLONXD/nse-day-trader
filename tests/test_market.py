@@ -154,6 +154,27 @@ class CalendarRules(unittest.TestCase):
             "years_covered": [2026], "source": {"2026": "c"}, "holidays": [{"date": "2026-10-02"}]}))
 
 
+class FileLocations(unittest.TestCase):
+    """A plugin is installed into Claude Code's cache: your filled lists must live in trader/."""
+
+    def test_trader_copy_wins_over_the_shipped_one(self):
+        old = os.environ.get("NSE_TRADER_DIR")
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["NSE_TRADER_DIR"] = d
+            try:
+                self.assertEqual(M.load_calendar().path, M.HOLIDAYS_FILE)
+                with open(TEST_CAL, encoding="utf-8") as f, open(os.path.join(d, "nse_holidays.json"), "w") as g:
+                    g.write(f.read())
+                cal = M.load_calendar()
+                self.assertEqual(cal.path, os.path.join(d, "nse_holidays.json"))
+                self.assertTrue(cal.is_trading_day(dt.date(2026, 11, 5)))
+            finally:
+                if old is None:
+                    os.environ.pop("NSE_TRADER_DIR", None)
+                else:
+                    os.environ["NSE_TRADER_DIR"] = old
+
+
 class Ticks(unittest.TestCase):
     def test_float_noise_is_cleaned(self):
         self.assertEqual(M.clean_price(1312.300048828125), 1312.3)

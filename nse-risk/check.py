@@ -145,8 +145,10 @@ def check(order, plan, cfg, cal, now, prices_path=None, tm=None):
         if stop < limits["lower"]:
             c.warn("lower circuit", "the stop %s is under the lower circuit %s: in a lock you may not be able to sell"
                    % (M.fmt_number(stop), M.fmt_number(limits["lower"])))
+    elif (plan or {}).get("band") == "No Band":
+        c.add("circuit", True, "no fixed price band (an F&O stock): no circuit limit applies")
     else:
-        c.warn("circuit", "circuit limits unknown (no band); run /nse-scanner daily for them")
+        c.warn("circuit", "circuit limits unknown (band unknown); run /nse-scanner daily for them")
     # money
     loss = costs.loss_at_stop(entry, stop, order["qty"], tick, lc)
     gain = costs.gain_at_target(entry, target, order["qty"], tick, lc)
