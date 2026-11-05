@@ -73,3 +73,37 @@ def round_trip(buy_price, sell_price, qty, c):
 
 def total(buy_price, sell_price, qty, c):
     return round_trip(buy_price, sell_price, qty, c)["total"]
+
+
+# ------------------------------------------------------------------ sizing, net of costs
+# Shared by nse-budget, nse-risk and nse-timemachine so all three size the same way.
+
+def fills(entry, stop, tick, c):
+    """(entry fill, stop fill): slippage_ticks against you on both market orders."""
+    slip = c["slippage_ticks"] * float(tick)
+    return entry + slip, stop - slip
+
+
+def loss_at_stop(entry, stop, qty, tick, c):
+    """Rupees lost if the stop fills at the stop (plus slippage), with every charge. A gap
+    through the stop can lose more."""
+    e_in, s_out = fills(entry, stop, tick, c)
+    return qty * (e_in - s_out) + total(e_in, s_out, qty, c)
+
+
+def gain_at_target(entry, target, qty, tick, c):
+    """Rupees made if the target (a limit order, no slippage) fills, after every charge."""
+    e_in = entry + c["slippage_ticks"] * float(tick)
+    return qty * (target - e_in) - total(e_in, target, qty, c)
+
+
+def max_qty_for_loss(entry, stop, tick, max_loss, c):
+    """The most whole shares whose loss at the stop, with slippage and costs, is <= max_loss."""
+    e_in, s_out = fills(entry, stop, tick, c)
+    per = e_in - s_out
+    if per <= 0:
+        return 0
+    q = int(max_loss // per)
+    while q > 0 and loss_at_stop(entry, stop, q, tick, c) > max_loss + 1e-9:
+        q -= 1
+    return q

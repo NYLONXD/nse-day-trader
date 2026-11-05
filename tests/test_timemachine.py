@@ -65,8 +65,10 @@ class RealInfy(Base):
         self.assertEqual(code, 0)
         self.assertEqual(d["pool"]["sessions"], 58)                        # 60 days - Nov 5 - Oct 15 (gap)
         self.assertEqual(d["pool"]["left_out"], {"missing or empty bars": 1})
-        self.assertEqual((d["qty"], d["risk_inr"]), (46, 492.2))           # 500 // 10.70 = 46
-        self.assertEqual(d["costs"]["at_target"]["total"], 57.24)          # hand-checked in costs tests
+        # Sized like nse-budget: 41 shares lose Rs. 492.98 at the stop with costs and slippage, 42 would lose 505.
+        self.assertEqual((d["qty"], d["risk_inr"]), (41, 438.7))
+        self.assertEqual(d["costs"]["at_target"]["total"],
+                         costs.round_trip(1160.55, 1181.9, 41, costs.DEFAULT_COSTS)["total"])
         self.assertEqual((d["net_r_at_target"], d["net_r_at_stop"]), (1.879, -1.124))
         self.assertEqual(len(d["costs"]["still_placeholder"]), len(costs.RATE_KEYS))
         mc = d["mc"]
@@ -123,7 +125,7 @@ class RealInfy(Base):
         self.infy_plan()
         code, out = self.run_mod(tm, ["run", "--offline", PHASE0, "--now", NOW, "--holidays", CAL, "--write"])
         self.assertEqual(code, 0)
-        for want in ("seed 915", "PLACEHOLDERS", "break-even after costs", "not a prediction", "Rs. 57.24"):
+        for want in ("seed 915", "PLACEHOLDERS", "break-even after costs", "not a prediction", "Rs. 51.02"):
             self.assertIn(want, out)
         self.assertTrue(os.path.exists(os.path.join(self.tmp, "timemachine.json")))
 
@@ -143,6 +145,24 @@ class RealInfy(Base):
         p = tm.portable_rules({"entry": 1000, "stop": 990, "target": 1020, "stop_rule": "price:990",
                                "target_rule": "price:1020"})
         self.assertEqual((p["stop_rule"], p["target_rule"]), ("pct:1", "pct:2"))
+
+
+class Sizing(Base):
+    def test_uses_the_budget_quantity_for_the_same_plan(self):
+        self.infy_plan()
+        with open(os.path.join(self.tmp, "order.json"), "w") as f:
+            json.dump({"symbol": "INFY.NS", "session": "2026-11-05", "stop": 1149.8, "target": 1181.9, "qty": 30}, f)
+        _, d = self.run_tm("--no-history")
+        self.assertEqual((d["qty"], d["qty_source"]), (30, "nse-budget (trader/order.json)"))
+        _, d = self.run_tm("--no-history", "--qty", "10")
+        self.assertEqual(d["qty"], 10)
+
+    def test_same_sizing_rule_as_the_budget(self):
+        c = costs.DEFAULT_COSTS
+        q = costs.max_qty_for_loss(1160.5, 1149.8, 0.05, 500, c)
+        self.assertEqual(q, 41)
+        self.assertLessEqual(costs.loss_at_stop(1160.5, 1149.8, 41, 0.05, c), 500)
+        self.assertGreater(costs.loss_at_stop(1160.5, 1149.8, 42, 0.05, c), 500)
 
 
 class Engine(unittest.TestCase):
@@ -198,7 +218,7 @@ class Refusals(Base):
         self.infy_plan()
         with open(os.path.join(self.tmp, "config.json"), "w") as f:
             json.dump({"max_loss_per_trade_inr": 5, "daily_loss_limit_inr": 10}, f)
-        self.assertIn("more than max_loss_per_trade_inr", self.refused())
+        self.assertIn("one share loses", self.refused())
 
     def test_no_plan(self):
         self.assertIn("run /nse-exit plan --write", self.refused())

@@ -23,6 +23,12 @@ import market  # noqa: E402
 
 DEFAULTS = {
     "paper": True,                         # v1 is paper only; nothing here places orders
+    "capital_inr": 100000,                 # the money this is for: only money you can afford to lose
+    "cash_buffer_pct": 10,                 # always left unused
+    "max_position_pct": 50,                # one position at most this share of capital
+    "max_order_inr": 50000,                # one order at most this much
+    "min_order_inr": 1000,                 # smaller orders are mostly costs
+    "blocked": [],                         # symbols you never want to trade, e.g. ["YESBANK"]
     "flat_by": "15:10",                    # every position closed by this bar end (IST)
     "no_entries_after": "14:30",           # no new entries from this time (IST)
     "max_loss_per_trade_inr": 500,         # stop distance x quantity, plus costs, at most this
@@ -35,7 +41,8 @@ DEFAULTS = {
 }
 
 POSITIVE_NUMBERS = ("max_loss_per_trade_inr", "daily_loss_limit_inr", "max_trades_per_day",
-                    "min_traded_value_inr", "min_reward_risk")
+                    "min_traded_value_inr", "min_reward_risk", "capital_inr", "max_order_inr",
+                    "max_position_pct")
 
 
 class ConfigError(ValueError):
@@ -62,6 +69,22 @@ def check(cfg):
         probs.append("min_price_inr must be a number, 0 or more (got %r)" % (v,))
     if not isinstance(cfg["max_trades_per_day"], int) or isinstance(cfg["max_trades_per_day"], bool):
         probs.append("max_trades_per_day must be a whole number")
+    for k in ("cash_buffer_pct", "min_order_inr"):
+        v = cfg[k]
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
+            probs.append("%s must be a number, 0 or more (got %r)" % (k, v))
+    for k in ("cash_buffer_pct", "max_position_pct"):
+        v = cfg[k]
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 100:
+            probs.append("%s is a percent: 100 at most (got %r)" % (k, v))
+    if not isinstance(cfg["blocked"], list):
+        probs.append("blocked must be a list of symbols")
+    else:
+        for s in cfg["blocked"]:
+            try:
+                market.normalize_symbol(s)
+            except market.MarketError:
+                probs.append("blocked: %r is not an NSE symbol" % (s,))
     if not isinstance(cfg["costs"], dict):
         probs.append("costs must be an object of rates (see shared/costs.py)")
     else:

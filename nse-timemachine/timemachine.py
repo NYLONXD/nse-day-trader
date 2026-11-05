@@ -230,7 +230,7 @@ def plan_rule_on_day(plan, bars, day, cfg, qty_rule, cost_cfg):
     risk = entry - stop
     raw_t, _ = orb.raw_target(plan["target_rule"], entry, risk)
     target = M.target_price(raw_t, tick)
-    qty = qty_rule(risk)
+    qty = qty_rule(entry, stop)
     if qty < 1:
         return dict(row, result="one share risks more than max_loss_per_trade_inr", entry=entry)
     pricing = Pricing(entry, stop, tick, qty, cost_cfg)
@@ -370,11 +370,24 @@ def check_plan(plan, cfg, cal):
     return day, slots.index(start) + 1, len(slots)
 
 
-def quantity_rule(cfg, cost_cfg, fixed=None):
-    """Shares for a given risk a share: --qty, else what max_loss_per_trade_inr allows."""
+def quantity_rule(cfg, cost_cfg, tick, fixed=None):
+    """Shares for an (entry, stop): --qty, else the same rule as nse-budget's max-loss limit:
+    the most shares whose loss at the stop, with slippage and costs, fits max_loss_per_trade_inr."""
     if fixed:
-        return lambda risk: fixed
-    return lambda risk: int(cfg["max_loss_per_trade_inr"] // risk) if risk > 0 else 0
+        return lambda entry, stop: fixed
+    return lambda entry, stop: costs.max_qty_for_loss(entry, stop, tick, cfg["max_loss_per_trade_inr"], cost_cfg)
+
+
+def budget_qty(plan):
+    """The quantity from trader/order.json when nse-budget sized this same plan."""
+    try:
+        with open(trader_path("order.json"), encoding="utf-8") as f:
+            o = json.load(f)
+    except (OSError, ValueError):
+        return None
+    same = (o.get("symbol") == plan["symbol"] and o.get("session") == plan["session"]
+            and o.get("stop") == plan["stop"] and o.get("target") == plan["target"])
+    return o.get("qty") if same else None
 
 
 def actual_today(plan, series, day, cfg, pricing, now):
@@ -424,12 +437,13 @@ def cmd_run(a):
         raise TMError("only %d full sessions before %s (need %d); left out: %s" % (
             len(pool), day, MIN_SESSIONS, dropped or "none"))
     cost_cfg = cfg["costs"]
-    qty_rule = quantity_rule(cfg, cost_cfg, a.qty)
-    risk = plan["entry"] - plan["stop"]
-    qty = qty_rule(risk)
+    from_budget = None if a.qty else budget_qty(plan)
+    qty_rule = quantity_rule(cfg, cost_cfg, plan["tick"], a.qty)
+    qty = from_budget or qty_rule(plan["entry"], plan["stop"])
     if qty < 1:
-        raise TMError("one share risks %s, more than max_loss_per_trade_inr %s: widen the limit or tighten the stop"
-                      % (M.fmt_inr(risk), M.fmt_inr(cfg["max_loss_per_trade_inr"])))
+        one = costs.loss_at_stop(plan["entry"], plan["stop"], 1, plan["tick"], cost_cfg)
+        raise TMError("one share loses %s at the stop with costs, more than max_loss_per_trade_inr %s: widen the "
+                      "limit or tighten the stop" % (M.fmt_inr(one), M.fmt_inr(cfg["max_loss_per_trade_inr"])))
     pricing = Pricing(plan["entry"], plan["stop"], plan["tick"], qty, cost_cfg)
     slots = session_slots(day, cfg)
     checkpoints = {}
@@ -445,7 +459,8 @@ def cmd_run(a):
     doc = {"plan": {k: plan.get(k) for k in ("symbol", "session", "entry", "stop", "target", "trigger_bar",
                                              "stop_rule", "target_rule", "tick", "setup")},
            "as_of": now.strftime("%Y-%m-%d %H:%M IST"), "flat_by": cfg["flat_by"], "qty": qty,
-           "qty_source": "--qty" if a.qty else "max_loss_per_trade_inr / risk a share",
+           "qty_source": ("--qty" if a.qty else "nse-budget (trader/order.json)" if from_budget
+                          else "max_loss_per_trade_inr, net of costs and slippage"),
            "risk_inr": round(pricing.risk_inr, 2),
            "costs": {"rates": {k: cost_cfg[k] for k in costs.RATE_KEYS}, "at_target": rt_target,
                      "still_placeholder": costs.placeholder_keys(cost_cfg)},

@@ -11,6 +11,7 @@ One phase at a time. Each phase: build, run tests, show results, commit, wait fo
 - [x] **Phase 3 — nse-entry and nse-exit.** Shared ORB rule (shared/orb.py) used by scanner and entry; entry: check/watch/watchlist, forming/waiting/triggered/expired/unusable/circuit/closed, optional volume filter (skips 09:15), Yahoo-lag handling; exit: or-mid/or-low/pct/price/atr stops, r/pct/price targets, tick rounding, circuit-aware target, flat_by. Daily tick inference now uses recent bars only.
 - [x] **Phase 4 — nse-timemachine.** 10,000 replays (seed 915) + history re-run, net of costs and slippage; shared/costs.py; stop/target rules moved to shared/orb.py; unbiasedness test on a mirrored real pool.
   - [ ] **You:** replace the placeholder cost rates in `trader/config.json` with your broker's (pricing page + a real contract note).
-- [ ] **Phase 5 — nse-budget and nse-risk.**
+- [x] **Phase 5 — nse-budget and nse-risk.** Sizing net of costs and slippage (shared/costs.py, also used by the Time Machine), no leverage; 25-line risk gate with fingerprint; shared/journal.py (today's entries, fresh prices).
+  - [ ] **You:** put your own capital and limits in `trader/config.json` (`python shared/config.py init`).
 - [ ] **Phase 6 — nse-alerts and nse-broker** (ticket only, never calls a broker).
 - [ ] **Phase 7 — README, plugin manifests, full test run.**
