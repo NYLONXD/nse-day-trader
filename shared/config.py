@@ -5,6 +5,8 @@ Market rules (session hours, ticks, holidays) are NOT settings; they live in mar
 
   python shared/config.py init    # writes trader/config.json with every default, if missing
   python shared/config.py show    # prints the settings in force and any problems
+  python shared/config.py calendar [YYYY-MM-DD]   # is that day (default: the next 7 days)
+                                  # a normal NSE session by your holiday list?
   python shared/config.py lists   # copies the empty holiday and tick-size lists into trader/,
                                   # where they survive plugin updates (fill them from NSE)
 
@@ -158,6 +160,25 @@ def main(argv=None):
             shutil.copyfile(src, dst)
             print("Wrote %s: fill it from NSE (the steps are inside). It wins over %s." % (dst, src))
         return 0
+    if cmd == "calendar":
+        import datetime as _dt
+        try:
+            cal = market.load_calendar()
+        except market.MarketError as e:
+            print("Holiday list problem: %s" % e)
+            return 1
+        print("Holiday list: %s" % cal.path)
+        if len(argv) > 1:
+            days = [market.parse_date(argv[1])]
+        else:
+            today = market.now_ist().date()
+            days = [today + _dt.timedelta(days=i) for i in range(8)]
+        ok = True
+        for d in days:
+            st = cal.status(d)
+            ok = ok and st.tradable if len(days) == 1 else ok
+            print("  %s  %-6s %s" % (d, "OPEN" if st.tradable else "NO", st.reason))
+        return 0 if ok else 1
     if cmd == "show":
         try:
             cfg, warnings = load()
@@ -168,7 +189,7 @@ def main(argv=None):
             print("Warning: " + w)
         print(json.dumps(cfg, indent=2))
         return 0
-    print("usage: config.py init | show | lists")
+    print("usage: config.py init | show | lists | calendar [YYYY-MM-DD]")
     return 2
 
 

@@ -39,17 +39,18 @@ alerts.
 
 You need [Claude Code](https://claude.com/claude-code) and Python 3.8 or newer.
 
-**As a plugin, from GitHub** (after you push this repo; replace `YOUR-GITHUB-USER`):
+**As a plugin, from GitHub**:
 
 ```
-/plugin marketplace add YOUR-GITHUB-USER/nse-day-trader
+/plugin marketplace add NYLONXD/nse-day-trader
 /plugin install nse-day-trader@nse-day-trader
 ```
 
-**As a plugin, from this folder** (works now):
+**As a plugin, from a local clone** (`git clone https://github.com/NYLONXD/nse-day-trader.git`,
+then point at the folder you cloned into):
 
 ```
-/plugin marketplace add D:/Professional_life/skills/nse-day-trader
+/plugin marketplace add ./nse-day-trader
 /plugin install nse-day-trader@nse-day-trader
 ```
 
@@ -61,13 +62,12 @@ position".
 `shared/` and `data/` folders side by side into `~/.claude/skills/` (or a project's
 `.claude/skills/`). Every skill imports `../shared`, so they must stay siblings.
 
-When you push to GitHub, add your repo to `.claude-plugin/plugin.json` (and to the plugin entry in
-`marketplace.json`):
+**Or no install at all**: clone the repo and run the scripts with `python` from a folder of your
+own (your `trader/` folder lands there). The [first live day guide](docs/first-live-day.md) does it
+this way.
 
-```json
-"homepage": "https://github.com/YOUR-GITHUB-USER/nse-day-trader",
-"repository": "https://github.com/YOUR-GITHUB-USER/nse-day-trader",
-```
+**Using it on a real trading day:** follow [docs/first-live-day.md](docs/first-live-day.md), a
+timed checklist from the evening before to 15:30.
 
 ## First-time setup (once)
 
@@ -79,6 +79,7 @@ Ask Claude "set my budget" (nse-budget walks you through it), or run these in yo
    `max_loss_per_trade_inr`, `daily_loss_limit_inr`, `max_trades_per_day`, `min_reward_risk`,
    `flat_by` (15:10), `no_entries_after` (14:30), `min_price_inr`, `min_traded_value_inr`.
    `python <plugin>/shared/config.py show` checks them.
+   `python <plugin>/shared/config.py calendar` shows which of the next days are open, by your list.
 2. **NSE holidays**: every date is refused until you fill the list from NSE's official circular
    ("Trading Holidays for the calendar year YYYY", nseindia.com > Resources > Exchange
    Communication > Holidays). Working from the cloned repo, fill `data/nse_holidays.json`. Installed
@@ -180,7 +181,7 @@ nse-day-trader/
   data/                  nse_holidays.json and nse_tick_sizes.json, for you to fill
   tests/                 offline tests on real saved Yahoo and NSE data (tests/fixtures/)
   tools/                 probe_yahoo.py, snapshot.py (save new fixtures), example_day.py
-  docs/                  phase0-feasibility.md
+  docs/                  first-live-day.md (a real day, step by step), phase0-feasibility.md
 ```
 
 ## Tests

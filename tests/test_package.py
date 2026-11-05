@@ -32,6 +32,8 @@ class Manifests(unittest.TestCase):
         for s in SKILLS:                                   # "skills": "./" finds every skill folder
             self.assertTrue(os.path.exists(os.path.join(ROOT, p["skills"], s, "SKILL.md")), s)
         self.assertIn("paper", p["description"].lower())
+        self.assertEqual(p["homepage"], "https://github.com/NYLONXD/nse-day-trader")
+        self.assertEqual(p["repository"], p["homepage"])
 
     def test_marketplace_json(self):
         m = json.loads(read(".claude-plugin", "marketplace.json"))
@@ -57,6 +59,8 @@ class Docs(unittest.TestCase):
                      "PLACEHOLDERS", "contract note", "day-trader-skill", "none of it is copied", "MIT"):
             self.assertIn(want, r)
         self.assertNotRegex(r, r"Alpaca|\$\d|\bUSD\b")             # no US-market leftovers
+        self.assertNotRegex(r, r"YOUR-GITHUB-USER|\b[A-Z]:[/\\]|Professional_life")   # no placeholders or PC paths
+        self.assertIn("NYLONXD/nse-day-trader", r)
 
     def test_license(self):
         lic = read("LICENSE")

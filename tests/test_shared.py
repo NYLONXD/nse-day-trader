@@ -53,6 +53,25 @@ class Config(unittest.TestCase):
                 self.assertEqual(json.load(f), config.DEFAULTS)
 
 
+class CalendarCommand(unittest.TestCase):
+    def test_says_open_or_no_for_a_day(self):
+        import contextlib
+        old = os.environ.get("NSE_HOLIDAYS_FILE")
+        os.environ["NSE_HOLIDAYS_FILE"] = os.path.join(FIX, "market", "holidays-test.json")
+        try:
+            for day, code, want in (("2026-11-05", 0, "OPEN"), ("2026-10-02", 1, "trading holiday"),
+                                    ("2026-11-08", 1, "special session"), ("2027-01-04", 1, "No NSE holiday list")):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    self.assertEqual(config.main(["calendar", day]), code, day)
+                self.assertIn(want, out.getvalue())
+        finally:
+            if old is None:
+                os.environ.pop("NSE_HOLIDAYS_FILE", None)
+            else:
+                os.environ["NSE_HOLIDAYS_FILE"] = old
+
+
 class Yahoo(unittest.TestCase):
     def setUp(self):
         self.calls, self.slept = [], []
