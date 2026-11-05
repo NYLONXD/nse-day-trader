@@ -8,7 +8,7 @@ One phase at a time. Each phase: build, run tests, show results, commit, wait fo
   - [ ] **You:** fill `data/nse_holidays.json` from NSE's circular (until then every date is refused).
   - [ ] **You (optional):** confirmed ticks in `data/nse_tick_sizes.json`.
 - [x] **Phase 2 — nse-scanner.** universe (EQUITY_L.csv / Nifty 500 / local CSV, EQ only, GSM out, price bands), daily (min price, median traded value, circuit skip, next-session limits, setup tags), orb (09:15-09:30 range, first close above, circuit-touch skip). Shared: config.py, yahoo.py, nse_files.py; circuit rules in market.py.
-- [ ] **Phase 3 — nse-entry and nse-exit.**
+- [x] **Phase 3 — nse-entry and nse-exit.** Shared ORB rule (shared/orb.py) used by scanner and entry; entry: check/watch/watchlist, forming/waiting/triggered/expired/unusable/circuit/closed, optional volume filter (skips 09:15), Yahoo-lag handling; exit: or-mid/or-low/pct/price/atr stops, r/pct/price targets, tick rounding, circuit-aware target, flat_by. Daily tick inference now uses recent bars only.
 - [ ] **Phase 4 — nse-timemachine.** 10,000 replays + history re-run, net of costs, fixed seed.
 - [ ] **Phase 5 — nse-budget and nse-risk.**
 - [ ] **Phase 6 — nse-alerts and nse-broker** (ticket only, never calls a broker).

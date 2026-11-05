@@ -27,12 +27,13 @@ DEFAULTS = {
     "max_loss_per_trade_inr": 500,         # stop distance x quantity, plus costs, at most this
     "daily_loss_limit_inr": 1500,          # stop for the day once realised loss reaches this
     "max_trades_per_day": 3,
+    "min_reward_risk": 1.5,                # target distance / stop distance, at least this
     "min_price_inr": 50,                   # scanner: skip stocks below this price
     "min_traded_value_inr": 100000000,     # scanner: median daily traded value, Rs. 10 cr
 }
 
 POSITIVE_NUMBERS = ("max_loss_per_trade_inr", "daily_loss_limit_inr", "max_trades_per_day",
-                    "min_traded_value_inr")
+                    "min_traded_value_inr", "min_reward_risk")
 
 
 class ConfigError(ValueError):

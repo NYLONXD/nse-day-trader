@@ -10,6 +10,7 @@ grid, symbols) come from market.py; this module only fetches and parses.
 The User-Agent says what this is. Never disguise it as a browser.
 """
 
+import datetime
 import gzip
 import json
 import os
@@ -25,6 +26,9 @@ SPARK_MAX = 20     # Yahoo's spark answers 400 above 20 symbols
 PAUSE = 0.3        # seconds between requests: be polite to a free endpoint
 BACKOFF = 5.0      # seconds before the one retry after a 429
 SLEEP = time.sleep  # tests swap this out
+# Live only: a bar counts as complete this long after its end, so Yahoo has had time to
+# send its last trades. Phase 0 could not measure the delay; raise this if bars look late.
+SETTLE = datetime.timedelta(seconds=20)
 
 
 class DataError(Exception):

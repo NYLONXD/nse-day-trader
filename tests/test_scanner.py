@@ -245,7 +245,7 @@ class Orb(Base):
 
     def test_refusals(self):
         self.watchlist()
-        cases = [("2026-11-05 09:32", "Too early"), ("2026-11-05 14:45", "no_entries_after"),
+        cases = [("2026-11-05 09:32", "Too early"), ("2026-11-05 14:45", "no_entries_after"), ("2026-11-05 14:30", "no_entries_after"),
                  ("2026-11-07 10:15", "Saturday"), ("2026-11-08 10:15", "special session"),
                  ("2026-10-02 10:15", "trading holiday"), ("2027-01-04 10:15", "No NSE holiday list for 2027")]
         for now, want in cases:

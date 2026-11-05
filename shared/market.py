@@ -387,7 +387,8 @@ def target_price(raw_target, tick=None):
 
 def infer_tick(prices, min_samples=TICK_MIN_SAMPLES):
     """The coarsest candidate tick that every price sits on, or None when there are too few
-    prices. Pass recent real prices (a few days of 5-minute OHLC); NSE reviews tick bands."""
+    prices. Pass RECENT real prices only (a few days of 5-minute OHLC): a stock's tick changes
+    when its price moves into another band, and older prices would mix the two ticks."""
     ds = [_dec(p) for p in prices if p is not None]
     if len(ds) < min_samples or len(set(ds)) < 20:
         return None

@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.join(SKILL_DIR, "..", "shared"))
 import config     # noqa: E402
 import market     # noqa: E402
 import nse_files  # noqa: E402
+import orb        # noqa: E402
 import yahoo      # noqa: E402
 
 M = market
@@ -40,6 +41,8 @@ MIN_DAILY_BARS = 21
 STAGE1_VALUE_FACTOR = 0.25   # spark pass: one quiet day must not drop a liquid stock
 MAX_CONFIRM = 200            # orb stage-2 charts per scan, most traded first
 TICK_BARS_5M = 375           # about five sessions of 5-minute bars for tick inference
+TICK_BARS_1D = 25            # recent daily bars only: a stock's tick changes with its price band
+                             # (BIRLACABLE traded in 0.01 steps near Rs. 236 in August, 0.05 near 340 now)
 
 
 class ScanError(Exception):
@@ -289,7 +292,7 @@ def scan_daily(names, stage1, stage2, now, cfg, overrides):
         if len(bars) < MIN_DAILY_BARS:
             failed[sym] = "only %d finished daily bars" % len(bars)
             continue
-        tick, tick_how = tick_info(sym, ser.prices(60), overrides)
+        tick, tick_how = tick_info(sym, ser.prices(TICK_BARS_1D), overrides)
         last, prev = bars[-1], bars[-2]
         last_sessions.add(str(last.t.date()))
         close = M.clean_price(last.c, tick)
@@ -399,87 +402,29 @@ def cmd_daily(a, cfg, overrides):
 
 # ------------------------------------------------------------------ orb
 
-def day_bars(series, day, cutoff):
-    """{bar start: Bar} for the session's grid bars that are complete by `cutoff`."""
-    out = {}
-    for b in series.day(day):
-        if M.is_bar_start(b.t) and M.bar_complete(b.t, cutoff):
-            out[b.t] = b
-    return out
-
-
-def expected_starts(day, cutoff):
-    return [t for t in M.bar_starts(day) if M.bar_complete(t, cutoff)]
-
-
 def orb_candidate(series, day, cutoff):
-    """Stage 1 on closes only: some completed bar after the range closed at or above the
-    highest range close. Necessary for a breakout (range high >= every range close)."""
-    bars = day_bars(series, day, cutoff)
-    rng = [bars.get(t) for t in M.opening_range_bar_starts(day)]
-    if any(b is None or b.c is None for b in rng):
-        return False
-    top = max(b.c for b in rng)
-    return any(b.c is not None and b.c >= top for t, b in bars.items() if t.time() >= M.OPENING_RANGE_END)
-
-
-def prev_close_for(sym, series, day, wl_entry, cal):
-    """(previous close, where it came from)."""
-    if wl_entry and wl_entry.get("last_session") and cal is not None:
-        prev_day = cal.previous_trading_day(day)
-        if prev_day is not None and wl_entry["last_session"] == str(prev_day):
-            return wl_entry["close"], "daily watchlist"
-    pc = series.meta.get("chartPreviousClose")
-    rng = str(series.meta.get("range") or "")
-    if pc and rng == "1d":
-        return pc, "Yahoo previous close"
-    earlier = [b for b in series.bars if b.t.date() < day and b.c is not None
-               and b.t.time() < M.LAST_RELIABLE_BAR_END]
-    if earlier:
-        return earlier[-1].c, "approx: last reliable 5-minute close of %s" % earlier[-1].t.date()
-    return None, "unknown"
+    return orb.closes_only_candidate(series, day, cutoff)
 
 
 def orb_confirm(sym, series, day, cutoff, cfg, overrides, wl_entry, cal):
     """Stage 2 on real highs and lows: (hit dict, None) or (None, reason it is not a hit)."""
-    bars = day_bars(series, day, cutoff)
-    need = expected_starts(day, cutoff)
-    missing = [M.fmt_time(t) for t in need if t not in bars or None in (bars[t].o, bars[t].h, bars[t].l, bars[t].c)]
+    bars = orb.day_bars(series, day, cutoff)
+    missing = orb.missing_bars(bars, day, cutoff)
     if missing:
         return None, "unusable: missing or empty bar(s) %s" % ",".join(missing[:4])
     tick, tick_how = tick_info(sym, series.prices(TICK_BARS_5M), overrides)
-    rng = [bars[t] for t in M.opening_range_bar_starts(day)]
-    or_high = M.clean_price(max(b.h for b in rng), tick)
-    or_low = M.clean_price(min(b.l for b in rng), tick)
-    ordered = [bars[t] for t in need]
+    or_high, or_low = orb.opening_range(bars, day, tick)
+    ordered = [bars[t] for t in sorted(bars)]
     last = ordered[-1]
     last_close = M.clean_price(last.c, tick)
     if last_close < cfg["min_price_inr"]:
         return None, "below the minimum price"
     band_text = (wl_entry or {}).get("band_raw")
-    prev_close, pc_how = prev_close_for(sym, series, day, wl_entry, cal)
-    day_high, day_low = max(b.h for b in ordered), min(b.l for b in ordered)
-    if prev_close:
-        reason = None
-        if band_text not in (None, "unknown"):
-            band = M.parse_band(band_text)
-            if band is not None:
-                for price, label in ((day_high, "high"), (day_low, "low")):
-                    side = M.circuit_side(price, prev_close, band, tick)
-                    if side:
-                        reason = "touched its %s circuit (%s%% band) today" % (side, band_text)
-                        break
-        elif band_text is None or band_text == "unknown":
-            side, b = M.guess_circuit(last.c, prev_close, day_high, day_low, tick)
-            if side:
-                reason = "looks locked at the %s circuit (band unknown)" % side
-        if reason:
-            return None, reason
-    hit_bar = None
-    for b in ordered:
-        if b.t.time() >= M.OPENING_RANGE_END and M.clean_price(b.c, tick) > or_high:
-            hit_bar = b
-            break
+    prev_close, pc_how = orb.prev_close_for(series, day, wl_entry, cal)
+    reason = orb.circuit_touch(ordered, prev_close, band_text, tick)
+    if reason:
+        return None, reason
+    hit_bar = orb.first_close_above(bars, or_high, tick)
     if hit_bar is None:
         return None, "no close above the range high"
     hit_close = M.clean_price(hit_bar.c, tick)
@@ -490,7 +435,7 @@ def orb_confirm(sym, series, day, cutoff, cfg, overrides, wl_entry, cal):
             "over_pct": round((hit_close / or_high - 1) * 100, 2),
             "last_close": last_close, "last_bar_end": M.fmt_time(M.bar_end(last.t)),
             "prev_close": prev_close and M.clean_price(prev_close, tick), "prev_close_source": pc_how,
-            "tick": float(tick), "tick_source": tick_how}, None
+            "band": band_text or "unknown", "tick": float(tick), "tick_source": tick_how}, None
 
 
 def orb_window(a, cfg, cal):
@@ -500,7 +445,7 @@ def orb_window(a, cfg, cal):
     st = cal.status(day)
     if not st.tradable:
         raise ScanError(st.reason + " No opening-range scan.")
-    cutoff = now
+    cutoff = now if a.now else now - yahoo.SETTLE
     if a.at:
         at = M.parse_hhmm(a.at)
         cutoff = M.ist(day.year, day.month, day.day, at.hour, at.minute)
@@ -511,8 +456,8 @@ def orb_window(a, cfg, cal):
         raise ScanError("Too early: the opening range ends at %s and the first bar after it completes at %s IST."
                         % (M.fmt_time(M.OPENING_RANGE_END), M.fmt_time(first_end)))
     nea = M.parse_hhmm(cfg["no_entries_after"])
-    if cutoff.time() > nea:
-        raise ScanError("It is past no_entries_after (%s IST): a breakout now would be an entry your rules "
+    if cutoff.time() >= nea:
+        raise ScanError("It is no_entries_after (%s IST) or later: a breakout now would be an entry your rules "
                         "forbid. Use --at HH:MM to look back at an earlier time." % cfg["no_entries_after"])
     return day, cutoff
 
@@ -522,15 +467,8 @@ def watchlist_entries(a):
     if a.symbols:
         return {s: {} for s in parse_symbols(a.symbols)}, "--symbols"
     path = a.watchlist or trader_path("watchlist.json")
-    doc = read_json(path, "watchlist (run: scan.py daily, or pass --symbols)")
-    out = {}
-    for h in doc.get("hits") or []:
-        e = dict(h)
-        band = h.get("band")
-        e["band_raw"] = (None if band in (None, "unknown") else "No Band" if band == "No Band"
-                         else str(band).rstrip("%"))
-        out[M.normalize_symbol(h["symbol"])] = e
-    return out, path
+    read_json(path, "watchlist (run: scan.py daily, or pass --symbols)")
+    return orb.load_watchlist(path), path
 
 
 def cmd_orb(a, cfg, overrides, cal):
@@ -561,7 +499,7 @@ def cmd_orb(a, cfg, overrides, cal):
     cands = [s for s in usable_1 if orb_candidate(stage1[s], day, cutoff)]
 
     def traded(s):
-        bars = day_bars(stage1[s], day, cutoff)
+        bars = orb.day_bars(stage1[s], day, cutoff)
         v = stage1[s].meta.get("regularMarketVolume") or 0
         last = [b.c for b in bars.values() if b.c is not None]
         return (last[-1] if last else 0) * v
