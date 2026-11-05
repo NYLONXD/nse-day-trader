@@ -19,7 +19,7 @@ WALL = os.path.join(FIX, "nse-scanner", "wall-symbols.txt")
 BANDS = os.path.join(FIX, "nse-scanner", "nse", "sec_list.csv")
 PHASE0 = os.path.join(FIX, "phase0")
 CAL = os.path.join(FIX, "market", "holidays-test.json")
-SHIPPED_CAL = os.path.join(os.path.dirname(FIX), "..", "data", "nse_holidays.json")
+EMPTY_CAL = os.path.join(FIX, "market", "holidays-empty.json")   # an unfilled list
 
 
 class Base(unittest.TestCase):
@@ -142,7 +142,7 @@ class Calendar(Base):
 
     def test_shipped_calendar_refuses(self):
         code, out = self.run_mod(entry, ["check", "INFY", "--offline", FIVE, "--now", "2026-11-05 10:15",
-                                         "--holidays", SHIPPED_CAL])
+                                         "--holidays", EMPTY_CAL])
         self.assertEqual(code, 1)
         self.assertIn("official circular", out)
         self.assertFalse(os.path.exists(os.path.join(self.tmp, "entry.json")))

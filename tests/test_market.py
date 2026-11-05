@@ -134,6 +134,18 @@ class CalendarRules(unittest.TestCase):
             self.assertEqual(st.kind, "unknown_year")
             self.assertIn("official circular", st.reason)
 
+    def test_shipped_list_agrees_with_real_yahoo_days(self):
+        """Your filled list vs the real saved charts: Yahoo has bars exactly on the open days."""
+        cal = M.load_calendar(os.path.join(ROOT, "data", "nse_holidays.json"))
+        _, bars = phase0_chart("SBIN.NS")
+        days = sorted({w.date() for w, _ in bars})
+        if days[0].year not in cal.years_covered:
+            self.skipTest("data/nse_holidays.json does not cover %d yet" % days[0].year)
+        cur = days[0]
+        while cur <= days[-1]:
+            self.assertEqual(cal.is_trading_day(cur), cur in days, cur)
+            cur += dt.timedelta(days=1)
+
     def _bad(self, doc):
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump(doc, f)

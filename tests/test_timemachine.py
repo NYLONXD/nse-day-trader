@@ -25,7 +25,7 @@ scan = load_skill("nse-scanner", "scan")
 PHASE0 = os.path.join(FIX, "phase0")
 FIVE = os.path.join(FIX, "nse-scanner", "wall-5m-5d-2026-11-05.json.gz")
 CAL = os.path.join(FIX, "market", "holidays-test.json")
-SHIPPED_CAL = os.path.join(os.path.dirname(FIX), "..", "data", "nse_holidays.json")
+EMPTY_CAL = os.path.join(FIX, "market", "holidays-empty.json")   # an unfilled list
 NOW = "2026-11-05 17:00"
 
 
@@ -204,7 +204,7 @@ class Refusals(Base):
 
     def test_bad_plans_and_data(self):
         self.infy_plan()
-        self.assertIn("official circular", self.refused(cal=SHIPPED_CAL))
+        self.assertIn("official circular", self.refused(cal=EMPTY_CAL))
         self.assertIn("only 4 full sessions", self.refused(data=FIVE))
         base = ["--symbol", "INFY", "--date", "2026-11-05", "--entry", "1160.5", "--target", "1181.9", "--tick", "0.05"]
         self.assertIn("stop < entry < target", self.refused(*base, "--stop", "1170", "--entry-bar", "09:35"))

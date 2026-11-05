@@ -256,7 +256,7 @@ class Orb(Base):
 
     def test_shipped_calendar_refuses_until_filled(self):
         code, out = self.run_scan("orb", "--offline", FIVE, "--now", "2026-11-05 10:15", "--symbols", "SBIN",
-                                  "--holidays", os.path.join(os.path.dirname(FIX), "..", "data", "nse_holidays.json"))
+                                  "--holidays", os.path.join(FIX, "market", "holidays-empty.json"))
         self.assertEqual(code, 1)
         self.assertIn("official circular", out)
 

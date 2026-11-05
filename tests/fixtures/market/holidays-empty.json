@@ -1,0 +1,7 @@
+{
+  "_note": "TEST DATA: an unfilled holiday list, like data/nse_holidays.json before the user fills it. Every date must be refused.",
+  "years_covered": [],
+  "source": {},
+  "holidays": [],
+  "special_sessions": []
+}

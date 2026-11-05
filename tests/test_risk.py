@@ -13,7 +13,7 @@ from test_budget import CAL, Chain, NOW, PHASE0
 check = load_skill("nse-risk", "check")
 size = load_skill("nse-budget", "size")
 tm = load_skill("nse-timemachine", "timemachine")
-SHIPPED_CAL = os.path.join(os.path.dirname(FIX), "..", "data", "nse_holidays.json")
+EMPTY_CAL = os.path.join(FIX, "market", "holidays-empty.json")   # an unfilled list
 
 
 class Base(Chain):
@@ -78,7 +78,7 @@ class Blocks(Base):
         self.order()
         self.assertIn("opening range is still forming", self.blocked("entry window", now="2026-11-05 09:25"))
         self.assertIn("past no_entries_after 14:30", self.blocked("entry window", now="2026-11-05 14:30"))
-        self.assertIn("official circular", self.blocked("calendar", cal=SHIPPED_CAL))
+        self.assertIn("official circular", self.blocked("calendar", cal=EMPTY_CAL))
 
     def test_too_many_shares(self):
         self.order()
