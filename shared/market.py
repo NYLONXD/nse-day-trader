@@ -13,9 +13,9 @@ What lives here, and nowhere else:
               weekend sessions) from data/nse_holidays.json, which the user
               fills from NSE's official circular. A year not marked complete
               in that file is refused, never guessed.
-  - Ticks:    per stock. A tick file the user fills wins; otherwise the
-              coarsest tick that all recent real prices sit on; otherwise
-              0.05. Stops round away from the entry, targets round half-up.
+  - Ticks:    per stock (0.01 to 5.00). A tick file the user fills wins;
+              otherwise the coarsest tick that all recent real prices sit on;
+              otherwise 0.05. Stops round away from the entry, targets round half-up.
   - Symbols:  Yahoo style SYMBOL.NS. "." is never turned into "-" (that is a
               US-only rule); NSE's own "-" and "&" are kept (BAJAJ-AUTO, M&M).
   - Money:    INR as "Rs." with Indian digit grouping (12,34,567.50).
@@ -108,6 +108,9 @@ OPENING_RANGE_END = _dt.time(9, 30)       # entries only after this
 # (NSE's closing-price window). Nothing may depend on them, so flat_by <= 15:15.
 LAST_RELIABLE_BAR_END = _dt.time(15, 15)
 BAR = _dt.timedelta(minutes=BAR_MINUTES)
+# NSE's official close is computed after 15:30; a session's daily bar is treated as final
+# from 16:00 IST. Before that, today's daily bar is left out.
+DAILY_BAR_FINAL = _dt.time(16, 0)
 
 
 def _at(day, t):
@@ -302,9 +305,11 @@ def load_calendar(path=None):
 # ------------------------------------------------------------------ ticks
 
 TICK_DEFAULT = Decimal("0.05")
-# Coarsest first. Never finer than 0.05: a 0.05 price is valid for any stock whose
-# real tick is 0.05 or finer (0.01), so 0.05 is the safe floor.
-TICK_CANDIDATES = (Decimal("5.00"), Decimal("1.00"), Decimal("0.50"), Decimal("0.10"), Decimal("0.05"))
+# Coarsest first. Real data (Phase 2): low-priced stocks trade in 0.01 steps (PASHUPATI
+# 120.47, KOTIC 126.99), most in 0.05, RELIANCE and TCS in 0.10. The default stays 0.05 when
+# nothing is known: a 0.05 price is also valid for a 0.01 stock, so it is the safe floor.
+TICK_CANDIDATES = (Decimal("5.00"), Decimal("1.00"), Decimal("0.50"), Decimal("0.10"),
+                   Decimal("0.05"), Decimal("0.01"))
 TICK_MIN_SAMPLES = 100     # prices needed before a tick is inferred
 TICKS_FILE = os.path.join(ROOT, "data", "nse_tick_sizes.json")
 # Yahoo sends prices as 32-bit floats: 2481.39990234375 for 2481.40, and the error grows
@@ -389,7 +394,7 @@ def infer_tick(prices, min_samples=TICK_MIN_SAMPLES):
     for t in TICK_CANDIDATES:
         if all(on_tick(d, t) for d in ds):
             return t
-    return TICK_DEFAULT  # finer than 0.05 (e.g. 0.01): 0.05 is still a valid grid
+    return None  # not even on a 0.01 grid: not NSE prices
 
 
 def load_tick_overrides(path=None):
@@ -502,3 +507,63 @@ def fmt_inr_compact(x):
     else:
         s = fmt_inr(a)
     return sign + s
+
+
+# ------------------------------------------------------------------ circuit limits
+
+# NSE gives most stocks a fixed daily price band (2, 5, 10, 20 or 40 % of the previous
+# close) in sec_list.csv. F&O stocks say "No Band": no fixed circuit (dynamic bands).
+# A stock at its circuit cannot be bought (upper: no sellers) or sold (lower: no buyers),
+# so the scanner skips it.
+BAND_CANDIDATES = (Decimal(2), Decimal(5), Decimal(10), Decimal(20))
+
+
+def parse_band(text):
+    """sec_list.csv 'Band' -> Decimal percent, None for 'No Band'. Raises on anything else."""
+    s = str(text or "").strip()
+    if s.lower() == "no band":
+        return None
+    try:
+        b = Decimal(s)
+    except Exception:
+        raise MarketError("not a price band: %r" % (text,))
+    if b <= 0 or b > 100:
+        raise MarketError("not a price band: %r" % (text,))
+    return b
+
+
+def circuit_limits(prev_close, band_pct, tick=None):
+    """(lower, upper) for a session whose previous close is `prev_close`. The limits are
+    pulled inside the band onto the tick grid."""
+    p, b = _dec(prev_close), _dec(band_pct)
+    raw_up, raw_lo = p * (1 + b / 100), p * (1 - b / 100)
+    return round_to_tick(raw_lo, tick, "up"), round_to_tick(raw_up, tick, "down")
+
+
+def circuit_side(price, prev_close, band_pct, tick=None):
+    """'upper', 'lower' or None: is `price` at a circuit limit? Exact, apart from Yahoo's
+    float noise (the limits matched NSE's to the paisa on real locked stocks). A coarser
+    tick than the real one only pulls the limits inward, so it errs towards skipping."""
+    lo, up = circuit_limits(prev_close, band_pct, tick)
+    p = _dec(price)
+    tol = _f32_tolerance(p)
+    if p >= _dec(up) - tol:
+        return "upper"
+    if p <= _dec(lo) + tol:
+        return "lower"
+    return None
+
+
+def guess_circuit(close, prev_close, high, low, tick=None):
+    """When the band is unknown: (side, band) if the day looks locked at a standard band,
+    i.e. it closed at its high (or low) within one tick of that band's limit. Errs on the
+    side of skipping the stock. (None, None) when it does not look locked."""
+    t = _tick(tick)
+    c = _dec(close)
+    for b in BAND_CANDIDATES:
+        lo, up = circuit_limits(prev_close, b, t)
+        if abs(c - _dec(up)) <= t and c >= _dec(high) - t:
+            return "upper", b
+        if abs(c - _dec(lo)) <= t and c <= _dec(low) + t:
+            return "lower", b
+    return None, None

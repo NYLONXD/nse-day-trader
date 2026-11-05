@@ -2,7 +2,7 @@
   "_how_to_fill": [
     "Optional. A tick here always wins over the tick inferred from recent prices.",
     "Get each stock's tick size from NSE (the security's quote page or NSE's tick-size circular) or your broker's order window.",
-    "Allowed values: 0.05, 0.10, 0.50, 1.00, 5.00. A stock whose real tick is 0.01 needs no entry: 0.05 prices are valid for it.",
+    "Allowed values: 0.01, 0.05, 0.10, 0.50, 1.00, 5.00.",
     "NSE reviews tick bands from time to time; re-check entries when NSE announces a revision."
   ],
   "as_of": "",
