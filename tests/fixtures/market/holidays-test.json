@@ -1,0 +1,14 @@
+{
+  "_note": "TEST DATA ONLY, not NSE's calendar. The three weekdays are the ones with no Yahoo bars in tests/fixtures/phase0 (fetched 2026-11-05); the names are placeholders, not real holiday names. The special session date is made up.",
+  "years_covered": [2026],
+  "source": {"2026": "test fixture, not an NSE circular"},
+  "holidays": [
+    {"date": "2026-09-14", "name": "test holiday A (no Yahoo bars)"},
+    {"date": "2026-10-02", "name": "test holiday B (no Yahoo bars)"},
+    {"date": "2026-10-20", "name": "test holiday C (no Yahoo bars)"}
+  ],
+  "special_sessions": [
+    {"date": "2026-11-08", "name": "test special session on a Sunday"},
+    {"date": "2026-11-06", "name": "test special session on a weekday"}
+  ]
+}

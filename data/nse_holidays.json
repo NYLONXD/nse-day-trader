@@ -1,0 +1,14 @@
+{
+  "_how_to_fill": [
+    "1. Open NSE's holidays page (nseindia.com > Resources > Exchange Communication > Holidays) or the circular titled 'Trading Holidays for the calendar year YYYY'.",
+    "2. Use the Equities / Capital Market segment list. Copy every holiday as {\"date\": \"YYYY-MM-DD\", \"name\": \"...\"} into 'holidays'. Weekends are refused anyway, so weekend holidays are optional.",
+    "3. Copy special sessions into 'special_sessions': Muhurat trading, a budget-day Saturday/Sunday session, any mock or DR session NSE announces. The toolkit refuses to trade them.",
+    "4. Put the circular's reference number and date in source[\"YYYY\"].",
+    "5. Only when that year's list is complete, add the year to 'years_covered'. Until then every date in that year is refused.",
+    "Later circulars (an added holiday, a Muhurat time) must be added by hand too."
+  ],
+  "years_covered": [],
+  "source": {},
+  "holidays": [],
+  "special_sessions": []
+}

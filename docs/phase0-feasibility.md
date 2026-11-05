@@ -16,7 +16,7 @@ measure yet: how delayed the newest bar is during the session.**
 | Missing bars | No missing slots. Null bars (prices = null): the closing minutes, 15:20 every day and often 15:15/15:25, plus 11:45 and 11:50 on 2026-10-15 in all five stocks (a market-wide gap). |
 | Volume present? | Yes, except the **09:15 bar has volume 0 on 295 of 300 stock-days** (prices are real). The 15:15/15:20 bars often have 0 too. Summed 5-minute volume is 83-97 % of Yahoo's daily volume. |
 | Closed weekdays | 2026-09-14, 2026-10-02, 2026-10-20 had no bars in any stock. Check them against NSE's holiday circular when you fill `data/nse_holidays.json`. |
-| Tick | Every price is on the 0.05 grid once float noise (1312.300048828125) is rounded. |
+| Tick | Every price is on the 0.05 grid once float noise (1312.300048828125) is rounded. **But (found in Phase 1) the tick is per stock:** RELIANCE and TCS only ever trade in 0.10 steps; INFY, SBIN and HDFCBANK in 0.05 (INFY and SBIN even above Rs. 1,000). So `market.py` uses a tick file you fill, else the tick inferred from recent prices, else 0.05. |
 
 ## What this changes in the design
 
