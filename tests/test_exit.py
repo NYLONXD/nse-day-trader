@@ -90,6 +90,47 @@ class Plans(Base):
         self.assertEqual(code, 0)
         self.assertTrue(any("min_reward_risk" in n for n in p["notes"]))
 
+    def test_replan_from_a_later_price_keeps_the_entry_file(self):
+        # INFY triggered at 09:40 (bar 09:35) at 1160.50; the price ran on to 1165 by 10:17.
+        self.infy()
+        code, p = self.plan("--entry", "1165", "--now", "2026-11-05 10:17")
+        self.assertEqual(code, 0)
+        self.assertEqual((p["symbol"], p["entry"], p["stop"], p["trigger_bar"]), ("INFY.NS", 1165.0, 1149.8, "10:15"))
+        self.assertEqual((p["or_high"], p["or_low"]), (1154.7, 1144.9))      # range kept from entry.json
+        with open(os.path.join(self.tmp, "entry.json"), encoding="utf-8") as f:
+            e = json.load(f)
+        self.assertEqual((p["band"], p["limits"], p["tick"]), (e["band"], e["limits"], e["tick"]))   # kept too
+        self.assertIn("your price, entry bar 10:15", p["entry_source"])
+        self.assertIn("1,160.50 at 09:40", p["entry_source"])
+        # The same with the symbol given, and an explicit entry bar.
+        code, p = self.plan("--symbol", "INFY", "--entry", "1165", "--entry-bar", "10:05", "--now", "2026-11-05 10:17")
+        self.assertEqual((code, p["trigger_bar"], p["stop"]), (0, "10:05", 1149.8))
+
+    def test_replan_after_the_session_keeps_the_trigger_bar_and_says_so(self):
+        self.infy()
+        code, p = self.plan("--entry", "1165", "--now", "2026-11-05 17:00")
+        self.assertEqual((code, p["trigger_bar"]), (0, "09:35"))
+        self.assertTrue(any("--entry-bar" in n for n in p["notes"]))
+
+    def test_replan_refusals(self):
+        self.infy()
+        code, out = self.run_mod(exitp, ["plan", "--entry", "1165", "--entry-bar", "09:30", "--now", "2026-11-05 10:17"])
+        self.assertIn("before the trigger bar 09:35", out)
+        code, out = self.run_mod(exitp, ["plan", "--entry", "1165", "--entry-bar", "10:07"])
+        self.assertIn("not a 5-minute bar start", out)
+        code, out = self.run_mod(exitp, ["plan", "--entry", "1165", "--entry-bar", "09:20"])
+        self.assertIn("not a 5-minute bar start", out)
+
+    def test_entry_without_symbol_or_entry_file(self):
+        code, out = self.run_mod(exitp, ["plan", "--entry", "1165"])
+        self.assertEqual(code, 1)
+        self.assertIn("no triggered entry in trader/entry.json to re-plan", out)
+
+    def test_other_symbol_ignores_the_entry_file(self):
+        self.infy()
+        code, p = self.plan("--symbol", "RELIANCE", "--entry", "1313.40", "--stop", "pct:0.7", "--entry-bar", "10:00")
+        self.assertEqual((code, p["symbol"], p["trigger_bar"], p["band"]), (0, "RELIANCE.NS", "10:00", "unknown"))
+
     def test_manual_entry_with_a_010_tick(self):
         code, p = self.plan("--symbol", "RELIANCE", "--entry", "1313.40", "--stop", "pct:0.7", "--tick", "0.10")
         self.assertEqual(code, 0)

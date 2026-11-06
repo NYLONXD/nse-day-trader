@@ -12,7 +12,7 @@ measure yet: how delayed the newest bar is during the session.**
 | Bars start at 09:15? | Yes. Every one of 60 days: 75 bars, 09:15 to 15:25 IST, all on the 5-minute grid. |
 | Time zone | Yahoo says `Asia/Kolkata`, gmtoffset 19800 (+05:30). Exchange code `NSI`, currency INR. |
 | How far back? | `range=60d` gives **60 trading days** (2026-08-11 to 2026-11-05). Explicit `period1/period2` windows must sit within the last **60 calendar days** ("The requested range must be within the last 60 days"). Use `range=60d`. |
-| Delay of latest bar vs now | **Not measured.** The market was closed (last bar 15:25, `regularMarketTime` 15:28:33). Run `python tools/probe_yahoo.py --no-save` during market hours to measure it. |
+| Delay of latest bar vs now | **Measured live on 2026-11-06 at 09:36 IST: near real time.** `regularMarketTime` was 09:36:13-09:36:20 when fetched at about 09:36:25 (`latest_bar_age_min` -0.1 to -0.2); the 5-minute bars to 09:30 were complete. During the session Yahoo also sends one off-grid "live tick" bar at the latest trade time; the tools count only bars older than `SETTLE` (20 s) past their end, so that is enough. |
 | Missing bars | No missing slots. Null bars (prices = null): the closing minutes, 15:20 every day and often 15:15/15:25, plus 11:45 and 11:50 on 2026-10-15 in all five stocks (a market-wide gap). |
 | Volume present? | Yes, except the **09:15 bar has volume 0 on 295 of 300 stock-days** (prices are real). The 15:15/15:20 bars often have 0 too. Summed 5-minute volume is 83-97 % of Yahoo's daily volume. |
 | Closed weekdays | 2026-09-14, 2026-10-02, 2026-10-20 had no bars in any stock. Check them against NSE's holiday circular when you fill `data/nse_holidays.json`. |

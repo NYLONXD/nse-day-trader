@@ -4,8 +4,13 @@ Standard library only, Python 3.8+. It never places an order.
   exit.py plan [--stop or-mid|or-low|price:X|pct:X|atr:K] [--target r:K|price:X|pct:X] [--write]
       reads trader/entry.json (from nse-entry), prints the plan, and with --write saves
       trader/plan.json for nse-timemachine, nse-budget, nse-risk and nse-alerts.
-  exit.py plan --symbol SBIN --entry 1006.40 --or-high 1003 --or-low 995 ...
-      the same without an entry file (or-* stops need the range).
+  exit.py plan --entry 3272 [--entry-bar HH:MM] [--write]
+      re-plan the trigger in trader/entry.json from a later price (the price ran on and
+      nse-risk blocked the reward:risk). Symbol, range, tick, band and limits stay from the
+      entry file; the entry bar becomes the 5-minute bar running now (or --entry-bar), so
+      nse-timemachine replays from there.
+  exit.py plan --symbol SBIN --entry 1006.40 --or-high 1003 --or-low 995 [--entry-bar HH:MM] ...
+      the same without an entry file (or-* stops need the range; nse-timemachine needs --entry-bar).
 
 Rules (prices from shared/market.py):
   - A stop rounds AWAY from the entry onto the stock's tick (down, for a long); a target
@@ -32,6 +37,7 @@ import yahoo   # noqa: E402
 
 M = market
 MIN_STOP_TICKS = 2
+TRIGGER_CLOSE = "the trigger bar's close"
 NOT_A_GUARANTEE = ("The stop is a plan, not a guarantee: a gap, a fast market or a circuit lock "
                    "can fill you worse than the stop, or not at all.")
 
@@ -78,7 +84,7 @@ def build_plan(entry, stop_rule, target_rule, cfg, offline=None):
     sym = M.normalize_symbol(entry["symbol"])
     tick = entry.get("tick") or float(M.TICK_DEFAULT)
     e = M.clean_price(entry["entry_price"], tick)
-    notes = []
+    notes = list(entry.get("_notes") or [])
     kind, x = orb.parse_rule(stop_rule, orb.STOP_RULES, "--stop")
     bars = None
     if kind == "atr":
@@ -125,7 +131,7 @@ def build_plan(entry, stop_rule, target_rule, cfg, offline=None):
         raise PlanError("the trigger at %s is at or after no_entries_after %s" % (
             entry["trigger_time"], cfg["no_entries_after"]))
     return {"symbol": sym, "name": entry.get("name", ""), "session": entry.get("session"), "side": "long",
-            "entry": e, "entry_source": "the trigger bar's close" if entry.get("trigger_bar") else "your price",
+            "entry": e, "entry_source": entry.get("entry_source") or TRIGGER_CLOSE,
             "trigger_time": entry.get("trigger_time"),
             "stop": stop, "stop_rule": stop_rule, "stop_why": why,
             "target": target, "target_rule": target_rule, "target_why": twhy,
@@ -140,28 +146,92 @@ def build_plan(entry, stop_rule, target_rule, cfg, offline=None):
             "notes": notes, "stop_is_a_plan": NOT_A_GUARANTEE}
 
 
-def entry_from_args(a):
-    if a.symbol or a.entry is not None:
-        if not (a.symbol and a.entry is not None):
-            raise PlanError("without an entry file give both --symbol and --entry")
-        e = {"symbol": a.symbol, "entry_price": a.entry, "or_high": a.or_high, "or_low": a.or_low,
-             "session": a.session, "band": "unknown", "limits": None}
-        tick = M.tick_for(a.symbol, None, M.load_tick_overrides(a.ticks))[0]
-        e["tick"] = float(a.tick or tick)
-        if a.upper_limit:
-            e["limits"] = {"lower": a.lower_limit or 0.0, "upper": a.upper_limit}
-        return e
+def check_entry_bar(text):
+    """HH:MM on the 5-minute grid, after the opening range (what nse-timemachine accepts)."""
+    try:
+        t = M.parse_hhmm(text)
+    except Exception:
+        raise PlanError("--entry-bar %r is not HH:MM" % text)
+    if t.minute % M.BAR_MINUTES or t < M.OPENING_RANGE_END or t >= M.SESSION_CLOSE:
+        raise PlanError("--entry-bar %s is not a 5-minute bar start from %s to before %s" % (
+            text, M.fmt_time(M.OPENING_RANGE_END), M.fmt_time(M.SESSION_CLOSE)))
+    return "%02d:%02d" % (t.hour, t.minute)
+
+
+def bar_running(session, now):
+    """The start of the 5-minute bar running at `now`, if `now` is inside that session after 09:30."""
+    if not session or now.date() != M.parse_date(session):
+        return None
+    t = now.time()
+    if t < M.OPENING_RANGE_END or t >= M.SESSION_CLOSE:
+        return None
+    return "%02d:%02d" % (t.hour, t.minute - t.minute % M.BAR_MINUTES)
+
+
+def read_entry_file(a, required):
+    """trader/entry.json if it holds a triggered entry; else refuse (required) or None."""
     path = a.entry_file or trader_path("entry.json")
     try:
         with open(path, encoding="utf-8") as f:
             doc = json.load(f)
     except OSError:
+        if not required:
+            return None
         raise PlanError("no entry at %s: run /nse-entry SYMBOL first, or pass --symbol and --entry" % path)
     except ValueError:
         raise PlanError("%s is not valid JSON" % path)
     if doc.get("status") != "triggered":
+        if not required:
+            return None
         raise PlanError("%s is not a triggered entry (status %s)" % (path, doc.get("status")))
     return doc
+
+
+def replan_entry(doc, a):
+    """The triggered entry from the file, re-based on the later price the user gives (--entry).
+    Everything else stays; the entry bar moves to the bar running now (or --entry-bar)."""
+    e = dict(doc)
+    old_bar, old_price = doc.get("trigger_bar"), doc.get("entry_price")
+    bar = check_entry_bar(a.entry_bar) if a.entry_bar else bar_running(doc.get("session"), a.clock)
+    notes = []
+    if bar is None:
+        bar = old_bar
+        notes.append("Entry bar kept at the trigger bar %s (session %s is not running now). Pass --entry-bar "
+                     "HH:MM for the 5-minute bar you bought in, so nse-timemachine replays from there."
+                     % (old_bar, doc.get("session")))
+    elif old_bar and M.parse_hhmm(bar) < M.parse_hhmm(old_bar):
+        raise PlanError("--entry-bar %s is before the trigger bar %s" % (bar, old_bar))
+    e["entry_price"] = a.entry
+    e["trigger_bar"] = bar
+    e["entry_source"] = "your price, entry bar %s IST (the trigger bar's close was %s at %s IST)" % (
+        bar, M.fmt_number(old_price) if old_price is not None else "?", doc.get("trigger_time") or old_bar)
+    if a.tick:
+        e["tick"] = float(a.tick)
+    if a.upper_limit:
+        e["limits"] = {"lower": a.lower_limit or 0.0, "upper": a.upper_limit}
+    e["_notes"] = notes
+    return e
+
+
+def entry_from_args(a):
+    if a.symbol and a.entry is None:
+        raise PlanError("without an entry file give both --symbol and --entry")
+    if a.entry is None:
+        return read_entry_file(a, required=True)
+    doc = read_entry_file(a, required=False)
+    if doc is not None and (not a.symbol or M.normalize_symbol(a.symbol) == doc.get("symbol")):
+        return replan_entry(doc, a)
+    if not a.symbol:
+        raise PlanError("no triggered entry in trader/entry.json to re-plan: run /nse-entry SYMBOL first, "
+                        "or give --symbol with --entry")
+    e = {"symbol": a.symbol, "entry_price": a.entry, "or_high": a.or_high, "or_low": a.or_low,
+         "session": a.session, "band": "unknown", "limits": None, "entry_source": "your price",
+         "trigger_bar": check_entry_bar(a.entry_bar) if a.entry_bar else None}
+    tick = M.tick_for(a.symbol, None, M.load_tick_overrides(a.ticks))[0]
+    e["tick"] = float(a.tick or tick)
+    if a.upper_limit:
+        e["limits"] = {"lower": a.lower_limit or 0.0, "upper": a.upper_limit}
+    return e
 
 
 def cmd_plan(a):
@@ -177,8 +247,8 @@ def cmd_plan(a):
         return 0
     s = M.bare_symbol(plan["symbol"])
     print("Plan for %s (long), session %s:" % (s, plan["session"] or "?"))
-    print("  entry   %14s  %s%s" % (M.fmt_inr(plan["entry"]), plan["entry_source"],
-                                    " at %s IST" % plan["trigger_time"] if plan["trigger_time"] else ""))
+    at = plan["trigger_time"] if plan["entry_source"] == TRIGGER_CLOSE else None
+    print("  entry   %14s  %s%s" % (M.fmt_inr(plan["entry"]), plan["entry_source"], " at %s IST" % at if at else ""))
     print("  stop    %14s  %s: %s, rounded down to the %s tick" % (
         M.fmt_inr(plan["stop"]), plan["stop_rule"], plan["stop_why"], plan["tick"]))
     print("  target  %14s  %s: %s" % (M.fmt_inr(plan["target"]), plan["target_rule"], plan["target_why"]))
@@ -204,7 +274,9 @@ def build_parser():
     p.add_argument("--target", default="r:2", help="r:K | price:X | pct:X")
     p.add_argument("--entry-file", help="default trader/entry.json")
     p.add_argument("--symbol")
-    p.add_argument("--entry", type=float)
+    p.add_argument("--entry", type=float, help="your price; with a triggered trader/entry.json it re-plans that trigger")
+    p.add_argument("--entry-bar", help="the 5-minute bar you buy in, HH:MM IST (default: the bar running now)")
+    p.add_argument("--now", help='pin the clock: "YYYY-MM-DD HH:MM" IST')
     p.add_argument("--or-high", type=float)
     p.add_argument("--or-low", type=float)
     p.add_argument("--session")
@@ -227,6 +299,7 @@ def main(argv=None):
         ap.print_help()
         return 2
     try:
+        a.clock = M.parse_ist(a.now) if a.now else M.now_ist()
         return cmd_plan(a)
     except (PlanError, orb.RuleError, M.MarketError, yahoo.DataError, config.ConfigError) as e:
         print(json.dumps({"error": str(e)}) if a.json else "Refused: %s" % e)

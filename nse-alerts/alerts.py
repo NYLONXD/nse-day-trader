@@ -293,13 +293,38 @@ def cmd_check(a, cfg, cal, src, clock):
     return 0 if any(x for x, _ in rang) else 1
 
 
+ALERT_KEY = ("id", "symbol", "kind", "price", "time")
+
+
+def refresh(doc, today):
+    """Re-read trader/alerts.json so alerts added in another window (a second stock's from-plan)
+    are watched too, and cleared ones stay cleared; what already rang here stays rung.
+    Returns (the fresh doc, the alerts new since the last read)."""
+    disk = load_alerts(today)
+    mine = {tuple(x.get(k) for k in ALERT_KEY): x for x in doc["alerts"]}
+    new = []
+    for x in disk["alerts"]:
+        old = mine.get(tuple(x.get(k) for k in ALERT_KEY))
+        if old is None:
+            new.append(x)
+        elif old.get("fired_at") and not x.get("fired_at"):
+            x["fired_at"] = old["fired_at"]
+    return disk, new
+
+
 def cmd_watch(a, cfg, cal, src, clock):
     doc = load_alerts(clock.now().date())
     if not doc["alerts"]:
         raise AlertError("no alerts for today")
     until = M.parse_hhmm(a.until or cfg["flat_by"])
     any_rang = False
+    first = True
     while True:
+        if not first:
+            doc, new = refresh(doc, clock.now().date())
+            for x in new:
+                print("Now also watching: %s" % describe(x))
+        first = False
         for x in doc["alerts"]:
             if x.get("symbol"):
                 try:

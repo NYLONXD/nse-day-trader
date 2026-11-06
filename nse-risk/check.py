@@ -159,7 +159,8 @@ def check(order, plan, cfg, cal, now, prices_path=None, tm=None):
     rr = gain / loss if loss > 0 else 0
     c.add("reward:risk", rr >= cfg["min_reward_risk"], "net %.2f, at least %.2f" % (rr, cfg["min_reward_risk"])
           if rr >= cfg["min_reward_risk"] else "net reward:risk %.2f (after costs) is under min_reward_risk %.2f. "
-          "Fix: a farther target or a closer stop from /nse-exit, or skip it" % (rr, cfg["min_reward_risk"]))
+          "Fix: a farther target or a closer stop from /nse-exit (if the price ran on: exit.py plan "
+          "--entry PRICE re-plans from it), or skip it" % (rr, cfg["min_reward_risk"]))
     day = journal.load(now.date())
     used = journal.loss_used(day)
     dl = cfg["daily_loss_limit_inr"]

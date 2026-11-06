@@ -26,8 +26,16 @@ come from `${CLAUDE_SKILL_DIR}/../shared/market.py`; `flat_by`, `no_entries_afte
 python "${CLAUDE_SKILL_DIR}/exit.py" plan                                  # or-mid stop, 2R target, from trader/entry.json
 python "${CLAUDE_SKILL_DIR}/exit.py" plan --stop or-low --target r:1.5 --write   # -> trader/plan.json
 python "${CLAUDE_SKILL_DIR}/exit.py" plan --stop atr:1.5                   # 1.5 x the 14-bar ATR up to the trigger bar
-python "${CLAUDE_SKILL_DIR}/exit.py" plan --symbol SBIN --entry 1006.40 --stop pct:0.8 --target r:2
+python "${CLAUDE_SKILL_DIR}/exit.py" plan --entry 3272 --write            # re-plan the trigger from a later price
+python "${CLAUDE_SKILL_DIR}/exit.py" plan --symbol SBIN --entry 1006.40 --stop pct:0.8 --target r:2 --entry-bar 10:05
 ```
+
+**Re-plan from a later price.** If the price ran on after the trigger and nse-risk blocks the
+reward:risk, `plan --entry PRICE` re-plans the trigger in `trader/entry.json`. It keeps the
+symbol, range, tick, band and limits from that file and changes only two things: the entry
+becomes your price, and the entry bar becomes the 5-minute bar running now (or `--entry-bar
+HH:MM`). nse-timemachine then replays from that bar. Then replay, size and check it again.
+Never widen the stop just to pass.
 
 Exit code 0 for a plan, 1 when refused (the reason and the fix in one line).
 

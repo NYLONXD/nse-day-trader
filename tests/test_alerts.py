@@ -72,6 +72,31 @@ class PriceAlerts(Base):
         kinds = {a["kind"] + str(a.get("price", a.get("time"))): a["fired_at"] for a in self.saved()["alerts"]}
         self.assertEqual(kinds["below1154.65"], "cancelled")
 
+    def test_alerts_added_while_watching_are_watched_and_kept(self):
+        # A second stock's from-plan while watch runs in another window: before the fix, watch
+        # never saw it and its next write erased it from alerts.json (stop alert included).
+        self.al("add-time", "10:30", "--note", "first stock")
+        real_sleep, calls = alerts.Clock.sleep, []
+
+        def sleep(clock, seconds):
+            real_sleep(clock, seconds)
+            calls.append(1)
+            if len(calls) == 1:
+                self.al("add-time", "11:00", "--note", "second stock", now="2026-11-05 10:21")
+                self.al("add", "INFY", "below", "1100", now="2026-11-05 10:21")
+        alerts.Clock.sleep = sleep
+        try:
+            code, out = self.al("watch", "--every", "300", "--until", "11:30")
+        finally:
+            alerts.Clock.sleep = real_sleep
+        self.assertIn("Now also watching: 11:00 IST: second stock", out)
+        self.assertIn("Now also watching: INFY below 1,100.00", out)
+        self.assertIn("10:30 IST (now 10:31): first stock", out)
+        self.assertIn("11:00 IST (now 11:01): second stock", out)
+        saved = {a.get("note") or a["kind"]: a["fired_at"] for a in self.saved()["alerts"]}
+        self.assertEqual(saved, {"first stock": "10:31", "second stock": "11:01", "below": None})
+        self.assertEqual(out.count("first stock"), 1)                # rang once, kept rung after the re-read
+
     def test_duplicates_and_bad_input(self):
         self.al("add", "INFY", "below", "1150")
         code, out = self.al("add", "INFY", "below", "1150")

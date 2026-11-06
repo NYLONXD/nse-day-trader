@@ -3,7 +3,7 @@
 One phase at a time. Each phase: build, run tests, show results, commit, wait for "next".
 
 - [x] **Phase 0 — Feasibility.** Real 5-minute bars for 5 liquid .NS stocks from Yahoo; findings in `docs/phase0-feasibility.md`; fixtures in `tests/fixtures/phase0/`.
-  - [ ] Open item: measure live delay during market hours (`python tools/probe_yahoo.py --no-save` between 09:30 and 15:00 IST).
+  - [x] Open item: live delay measured 2026-11-06 09:36 IST: near real time (latest tick < 15 s old); `SETTLE` = 20 s kept.
 - [x] **Phase 1 — shared/market.py + tests.** IST, session, holidays file, special sessions, per-stock tick (tick file > inferred > 0.05), symbols, Rs. formatting.
   - [ ] **You:** fill `data/nse_holidays.json` from NSE's circular (until then every date is refused).
   - [ ] **You (optional):** confirmed ticks in `data/nse_tick_sizes.json`.
@@ -20,5 +20,5 @@ One phase at a time. Each phase: build, run tests, show results, commit, wait fo
 - [ ] Fill the NSE holiday list for 2026 (and 2027 when NSE publishes it): `data/nse_holidays.json`, or `trader/nse_holidays.json` for a plugin install (`python shared/config.py lists`).
 - [ ] `python shared/config.py init`, then your own capital and limits in `trader/config.json`.
 - [ ] Your broker's real cost rates in `trader/config.json` -> `costs` (check them against a contract note).
-- [ ] Once during market hours: `python tools/probe_yahoo.py --no-save` to measure Yahoo's delay.
+- [x] Once during market hours: `python tools/probe_yahoo.py --no-save` to measure Yahoo's delay (done 2026-11-06: near real time).
 - [ ] After you create the GitHub repo and push: add `homepage` and `repository` to `.claude-plugin/plugin.json` (README, Install section).

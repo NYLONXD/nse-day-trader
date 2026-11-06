@@ -77,6 +77,15 @@ class RealInfy(Base):
         self.assertLess(mc["mean_net_r"], mc["mean_gross_r"])              # costs always cost
         self.assertIn("Strongly toward the stop", d["verdict"])
 
+    def test_replays_a_replanned_entry_from_its_later_bar(self):
+        # The bug seen live on 2026-11-06: a re-plan with --entry lost the trigger bar and the
+        # Time Machine refused "the plan has no trigger_bar". Now it keeps the entry file and
+        # moves the entry bar to the bar running when the user re-plans.
+        self.infy_plan("--entry", "1165", "--now", "2026-11-05 10:17")
+        code, d = self.run_tm()
+        self.assertEqual(code, 0, d)
+        self.assertEqual((d["plan"]["trigger_bar"], d["plan"]["entry"], d["plan"]["stop"]), ("10:15", 1165.0, 1149.8))
+
     def test_same_seed_same_numbers_other_seed_close(self):
         self.infy_plan()
         _, a = self.run_tm("--no-history")
