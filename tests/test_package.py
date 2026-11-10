@@ -18,9 +18,9 @@ def read(*parts):
 
 
 class Manifests(unittest.TestCase):
-    def test_eight_skills(self):
+    def test_nine_skills(self):
         self.assertEqual(SKILLS, ["nse-alerts", "nse-broker", "nse-budget", "nse-entry", "nse-exit",
-                                  "nse-risk", "nse-scanner", "nse-timemachine"])
+                                  "nse-news", "nse-risk", "nse-scanner", "nse-timemachine"])
 
     def test_plugin_json(self):
         p = json.loads(read(".claude-plugin", "plugin.json"))
@@ -74,7 +74,7 @@ class Docs(unittest.TestCase):
 
 
 class ExampleDay(unittest.TestCase):
-    def test_all_eight_skills_run_end_to_end(self):
+    def test_the_eight_trade_skills_run_end_to_end(self):
         ex = load_skill("tools", "example_day")
         out = io.StringIO()
         with redirect_stdout(out), redirect_stderr(io.StringIO()):

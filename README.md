@@ -1,7 +1,7 @@
 # nse-day-trader
 
-Eight Claude skills for **paper** intraday trading on India's **NSE**: find opening-range
-breakouts, time the entry, plan the exit, replay the plan 10,000 times **net of costs**, size it
+Nine Claude skills for **paper** intraday trading on India's **NSE**: find opening-range
+breakouts, read the news and what the company told the exchange, time the entry, plan the exit, replay the plan 10,000 times **net of costs**, size it
 to your rupees, check it against your rules, ring alerts, and build a ticket **you place by hand**
 in your own broker app, or skip.
 
@@ -18,11 +18,12 @@ in your own broker app, or skip.
 > 10 individual intraday traders in the equity cash segment made a net loss. These tools help you
 > follow rules and see the honest odds after costs; they do not change those odds.
 
-## The eight skills
+## The nine skills
 
 | skill | job | writes |
 | --- | --- | --- |
 | `nse-scanner` | The NSE universe (Nifty 500 or EQUITY_L.csv, or your CSV), a daily liquidity watchlist that skips stocks at their circuit limit, and the 09:15-09:30 opening-range-breakout scan | `trader/universe.json`, `watchlist.json`, `orb_hits.json` |
+| `nse-news` | What is new about your stocks: NSE's announcement, board-meeting and corporate-action feeds (results dates, ex-dates), Yahoo headlines, and the move against the previous close. Each item once, tagged, `!` on what matters today | `trader/news.json`, `state/news.json` |
 | `nse-entry` | Watches one stock bar by bar: forming, waiting, triggered (time and price), expired | `trader/entry.json` |
 | `nse-exit` | Stop, target and flat-by time before the entry, on the stock's tick, circuit-aware | `trader/plan.json` |
 | `nse-timemachine` | 10,000 replays from the stock's own last 60 days + the same rule on every past day, net of costs, fixed seed | `trader/timemachine.json` |
@@ -32,8 +33,8 @@ in your own broker app, or skip.
 | `nse-broker` | A ticket for an order that PASSED, to type into your broker app yourself; the paper journal of your fills | `trader/ticket.txt`, `state/journal-*.json` |
 
 Each skill reads what the one before wrote, through JSON files in a `trader/` folder in the folder
-where you run Claude. The order of a day: scanner, entry, exit, timemachine, budget, risk, broker,
-alerts.
+where you run Claude. The order of a day: scanner, news, entry, exit, timemachine, budget, risk,
+broker, alerts. nse-news only reads and reports; run it again through the day.
 
 ## Install
 
@@ -58,7 +59,7 @@ Claude Code namespaces plugin skills: they show up as `/nse-day-trader:nse-scann
 Claude also picks them by their descriptions when you say things like "scan NSE" or "size my
 position".
 
-**As plain skills** (short names like `/nse-scanner`): copy the eight `nse-*` folders **and** the
+**As plain skills** (short names like `/nse-scanner`): copy the nine `nse-*` folders **and** the
 `shared/` and `data/` folders side by side into `~/.claude/skills/` (or a project's
 `.claude/skills/`). Every skill imports `../shared`, so they must stay siblings.
 
@@ -98,7 +99,7 @@ Ask Claude "set my budget" (nse-budget walks you through it), or run these in yo
 
 ## An example day (real data, Thu 5 Nov 2026)
 
-`python tools/example_day.py` runs all eight skills offline on real saved Yahoo data of that day,
+`python tools/example_day.py` runs the eight trade skills offline on real saved Yahoo data of that day,
 with a TEST holiday calendar and simulated fills. The highlights:
 
 ```
@@ -167,6 +168,9 @@ happened to end up Rs. 125.73.
   ones in 0.01, and a stock's tick changes when its price moves into another band.
 - **Circuit limits** computed from the band and the previous close matched, to the paisa, the
   prices where six real stocks locked on 5 Nov 2026.
+- **News**: NSE's public RSS feeds answer a plain script (three files for the whole market) but
+  carry the company's name, not its symbol, and only the latest items: at 09:18 on 10 Nov 2026,
+  179 of 183 announcements were ETF NAVs. Yahoo's headline feed was empty for RELIANCE and RBLBANK.
 - **Costs** took about 0.12R of a Rs. 500-risk INFY trade: sizing on price alone would have bought
   46 shares instead of 41 and lost about Rs. 553 at the stop.
 
@@ -175,12 +179,12 @@ happened to end up Rs. 125.73.
 ```
 nse-day-trader/
   .claude-plugin/        plugin.json, marketplace.json
-  nse-scanner/ ...       eight skills: SKILL.md + one script each
+  nse-scanner/ ...       nine skills: SKILL.md + one script each
   shared/                market.py (ALL market rules), orb.py (breakout, stop and target rules),
-                         costs.py, config.py, journal.py, yahoo.py, nse_files.py
+                         costs.py, config.py, journal.py, yahoo.py, nse_files.py (NSE's lists and RSS feeds)
   data/                  nse_holidays.json and nse_tick_sizes.json, for you to fill
   tests/                 offline tests on real saved Yahoo and NSE data (tests/fixtures/)
-  tools/                 probe_yahoo.py, snapshot.py (save new fixtures), example_day.py
+  tools/                 probe_yahoo.py, snapshot.py (save new fixtures, `news` too), example_day.py
   docs/                  first-live-day.md (a real day, step by step), phase0-feasibility.md
 ```
 

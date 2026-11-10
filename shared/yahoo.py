@@ -6,6 +6,7 @@ grid, symbols) come from market.py; this module only fetches and parses.
   fetch_chart(sym, "1d", "5m")      one v8 chart: open/high/low/close/volume
   fetch_spark(syms, "1d", "5m")     closes only, 20 symbols a request (cheap first pass)
   load_offline(path)                saved answers instead of the network (tests, replays)
+  fetch_headlines(sym)              Yahoo's headline RSS for one symbol, as text (nse-news)
 
 The User-Agent says what this is. Never disguise it as a browser.
 """
@@ -202,6 +203,17 @@ def fetch_spark(symbols, rng, interval, progress=None):
         if i + SPARK_MAX < len(syms):
             SLEEP(PAUSE)
     return got, failed
+
+
+HEADLINES = "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=IN&lang=en-IN"
+
+
+def fetch_headlines(sym):
+    """Yahoo's headline RSS for one symbol (text). Often empty for NSE stocks: that is not an error."""
+    try:
+        return http_get(HEADLINES % market.url_symbol(sym))
+    except (urllib.error.URLError, OSError) as e:
+        raise DataError("Yahoo sent no headlines for %s (%s)" % (market.bare_symbol(sym), getattr(e, "reason", e)))
 
 
 # ------------------------------------------------------------------ offline

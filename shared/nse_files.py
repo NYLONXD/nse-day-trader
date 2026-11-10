@@ -21,6 +21,16 @@ FILE_NAMES = {"equity": "EQUITY_L.csv", "nifty500": "ind_nifty500list.csv",
               "nifty50": "ind_nifty50list.csv", "bands": "sec_list.csv"}
 TRADABLE_SERIES = ("EQ",)  # BE/BZ are trade-for-trade (delivery only): no intraday
 
+# NSE's public RSS feeds (nseindia.com > RSS feeds): what companies told the exchange. One file
+# each for the whole market, so nse-news reads three files however many stocks you watch.
+FEEDS = {
+    "announcements": "https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml",
+    "board_meetings": "https://nsearchives.nseindia.com/content/RSS/Board_Meetings.xml",
+    "corporate_actions": "https://nsearchives.nseindia.com/content/RSS/Corporate_action.xml",
+}
+FEED_NAMES = {"announcements": "Online_announcements.xml", "board_meetings": "Board_Meetings.xml",
+              "corporate_actions": "Corporate_action.xml"}
+
 
 def download(kind):
     url = URLS[kind]
@@ -29,6 +39,14 @@ def download(kind):
     except Exception as e:
         raise yahoo.DataError("NSE did not send %s (%s). Download it in your browser from %s "
                               "and pass the saved file's path instead." % (FILE_NAMES[kind], e, url))
+
+
+def download_feed(kind):
+    url = FEEDS[kind]
+    try:
+        return yahoo.http_get(url, timeout=30)
+    except Exception as e:
+        raise yahoo.DataError("NSE did not send %s (%s)" % (FEED_NAMES[kind], e))
 
 
 def read_text(path):

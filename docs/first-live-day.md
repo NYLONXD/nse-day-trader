@@ -43,10 +43,12 @@ cd nse-day-trader
 | time | what | command |
 | --- | --- | --- |
 | before 09:15 | Check the day and set the bells | `python shared/config.py calendar` then `python nse-alerts/alerts.py bells` |
+| before 09:15 | News on the watchlist: results today, ex-dates, what companies filed overnight | `python nse-news/news.py` |
 | 09:15-09:30 | The opening range is forming. Do nothing. | (entry checks say FORMING) |
 | about 09:40 | Measure how late Yahoo is, once. Note the "latest_bar_age_min" | `python tools/probe_yahoo.py --no-save` |
 | 09:45-10:30 | Scan for breakouts (about a minute) | `python nse-scanner/scan.py orb --max-confirm 60` |
-| right after | Pick **one** hit: early, small "% over", a name you know. Check it | `python nse-entry/entry.py check SYMBOL` |
+| right after | Pick **one** hit: early, small "% over", a name you know. Read its news first (a `!` line: open the link) | `python nse-news/news.py SYMBOL --all` |
+| | Check it | `python nse-entry/entry.py check SYMBOL` |
 | | Plan the exit before anything else | `python nse-exit/exit.py plan --write` |
 | | Replay it (about a minute: it downloads 60 days) | `python nse-timemachine/timemachine.py run --write` |
 | | A fresh price, then size it | `python nse-alerts/alerts.py quote SYMBOL --write` then `python nse-budget/size.py --write` |

@@ -15,6 +15,9 @@ One phase at a time. Each phase: build, run tests, show results, commit, wait fo
   - [ ] **You:** put your own capital and limits in `trader/config.json` (`python shared/config.py init`).
 - [x] **Phase 6 — nse-alerts and nse-broker.** Alerts: quote -> prices.json, price/time alerts on completed bars, plan stop/target pair (OCO-style), bells. Broker: ticket only behind the risk fingerprint (today, <=15 min, in window), SL-M/SL and OCO-or-alert target with the no-two-resting-sells warning, capped limit, paper journal (placed/closed/flatten/status). Code-level test: no network, no secrets.
 - [x] **Phase 7 — README, plugin manifests, full test run.** README (install, first-time setup, real example day, data lessons, how to extend, credits), MIT LICENSE, .claude-plugin/plugin.json + marketplace.json (`claude plugin validate .` passes), tools/example_day.py (all eight skills end to end), trader/ copies of the holiday and tick lists win over the plugin's, 196 tests pass.
+- [x] **Phase 8 — nse-news.** What is new about your stocks: NSE's announcement, board-meeting and corporate-action RSS (matched by company name, the filed document's name or the symbol in the text), Yahoo headline RSS, the move against the previous close; shown once (30 days), tags, `!` for results/risk/halt/people and events today or tomorrow; `tools/snapshot.py news`; real fixtures of 10 Nov 2026 09:18 IST. Plugin 0.2.0.
+- [ ] **Phase 9 — nse-analyst.** A company's quarterly results, quarter against the same quarter a year earlier. Data source to be proven first (as in Phase 0).
+- [ ] **Phase 10 — India's version of the Pelosi tracker.** Bulk and block deals / insider-trading disclosures. Data source to be proven first.
 
 ## Your to-do list (none of it is code)
 - [ ] Fill the NSE holiday list for 2026 (and 2027 when NSE publishes it): `data/nse_holidays.json`, or `trader/nse_holidays.json` for a plugin install (`python shared/config.py lists`).

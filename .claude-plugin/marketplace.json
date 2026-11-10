@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "nse-day-trader",
-      "description": "Eight skills for an NSE intraday day: nse-scanner, nse-entry, nse-exit, nse-timemachine, nse-budget, nse-risk, nse-alerts, nse-broker (ticket only). Paper only.",
+      "description": "Nine skills for an NSE intraday day: nse-scanner, nse-news, nse-entry, nse-exit, nse-timemachine, nse-budget, nse-risk, nse-alerts, nse-broker (ticket only). Paper only.",
       "source": "./",
       "category": "productivity",
       "homepage": "https://github.com/NYLONXD/nse-day-trader"

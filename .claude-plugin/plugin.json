@@ -1,7 +1,7 @@
 {
   "name": "nse-day-trader",
-  "description": "Eight Claude skills for paper intraday trading on India's NSE: scan for opening-range breakouts, time the entry, plan the exit, replay the plan 10,000 times net of costs, size it, check it against your rules, set alerts, and build a ticket you place by hand. Long only, IST, INR, paper only.",
-  "version": "0.1.0",
+  "description": "Nine Claude skills for paper intraday trading on India's NSE: scan for opening-range breakouts, read the news and exchange filings, time the entry, plan the exit, replay the plan 10,000 times net of costs, size it, check it against your rules, set alerts, and build a ticket you place by hand. Long only, IST, INR, paper only.",
+  "version": "0.2.0",
   "author": {
     "name": "Himanshu Jha",
     "email": "himanshujha202005@gmail.com"

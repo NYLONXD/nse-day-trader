@@ -6,6 +6,9 @@
       one bundle {"SYM.NS": <raw v8 chart>} (what nse-scanner --offline reads)
   python tools/snapshot.py spark --symbols A,B --range 3mo --interval 1d --out FILE.json
       Yahoo's raw spark answers merged into one {"spark": {"result": [...]}}
+  python tools/snapshot.py news OUTDIR --symbols A,B
+      what nse-news --offline OUTDIR reads: NSE's three RSS feeds, Yahoo's headline RSS for each
+      symbol (headlines-SYMBOL.xml) and one spark answer for the moves (moves.json)
   --symbols-file FILE: one symbol a line, or a CSV with a Symbol/SYMBOL column.
 
 Honest User-Agent only. If NSE refuses, download the file in your browser instead.
@@ -44,7 +47,7 @@ def read_symbols(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=("nse-files", "charts", "spark"))
+    ap.add_argument("what", choices=("nse-files", "charts", "spark", "news"))
     ap.add_argument("outdir", nargs="?")
     ap.add_argument("--symbols")
     ap.add_argument("--symbols-file")
@@ -69,6 +72,33 @@ def main(argv=None):
         return 0
 
     syms = read_symbols(a)
+    if a.what == "news":
+        os.makedirs(a.outdir, exist_ok=True)
+
+        def save(name, body):
+            with open(os.path.join(a.outdir, name), "w", encoding="utf-8", newline="") as f:
+                f.write(body)
+            print("%s: %d bytes" % (name, len(body)))
+        for kind, name in nse_files.FEED_NAMES.items():
+            try:
+                save(name, nse_files.download_feed(kind))
+            except yahoo.DataError as e:
+                print(e)
+            time.sleep(yahoo.PAUSE)
+        for s in syms:
+            try:
+                save("headlines-%s.xml" % market.bare_symbol(s), yahoo.fetch_headlines(s))
+            except yahoo.DataError as e:
+                print(e)
+            time.sleep(yahoo.PAUSE)
+        merged = {"_fetched": stamp, "spark": {"result": []}}
+        for i in range(0, len(syms), yahoo.SPARK_MAX):
+            doc = json.loads(yahoo.yahoo_get(yahoo.spark_path(syms[i:i + yahoo.SPARK_MAX], "1d", "5m")))
+            merged["spark"]["result"].extend((doc.get("spark") or {}).get("result") or [])
+            time.sleep(yahoo.PAUSE)
+        save("moves.json", json.dumps(merged, separators=(",", ":")))
+        print("Fetched %s." % stamp)
+        return 0
     if a.what == "charts":
         docs, failed = {"_fetched": stamp, "_request": "range=%s interval=%s" % (a.range, a.interval)}, []
         for i, s in enumerate(syms):
