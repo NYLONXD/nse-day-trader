@@ -93,10 +93,10 @@ class Source(object):
             self.cache[sym] = yahoo.fetch_chart(sym, "1d", "5m")
         return self.cache[sym]
 
-    def quote(self, sym, clock):
+    def quote(self, sym, clock, fresh=True):
         """(price, IST time, how). Live: Yahoo's latest trade. Offline: the last completed bar's
         close by the pinned clock (Yahoo's meta is the end of the day, so it is not used)."""
-        s = self.series(sym)
+        s = self.series(sym, fresh=fresh)
         tick = M.tick_for(sym, s.prices(375))[0]
         if self.data is None and s.meta.get("regularMarketPrice") and s.meta.get("regularMarketTime"):
             return (M.clean_price(s.meta["regularMarketPrice"], tick), M.to_ist(s.meta["regularMarketTime"]),
@@ -176,11 +176,11 @@ def evaluate(doc, src, clock, cal):
             if hit:
                 break
         if hit is None and src.data is None:
-            try:
-                p, when, _ = src.quote(a["symbol"], clock)
+            try:   # the chart just read (watch fetched it fresh); a network error here must not stop anything
+                p, when, _ = src.quote(a["symbol"], clock, fresh=False)
                 if (a["kind"] == "above" and p >= a["price"]) or (a["kind"] == "below" and p <= a["price"]):
                     hit = (p, "latest trade at %s" % M.fmt_time(when))
-            except AlertError:
+            except (AlertError, yahoo.DataError):
                 pass
         if hit:
             a["fired_at"] = now.strftime("%H:%M")
@@ -319,19 +319,34 @@ def cmd_watch(a, cfg, cal, src, clock):
     until = M.parse_hhmm(a.until or cfg["flat_by"])
     any_rang = False
     first = True
+    down = {}          # symbol -> when its prices stopped coming
     while True:
         if not first:
             doc, new = refresh(doc, clock.now().date())
             for x in new:
                 print("Now also watching: %s" % describe(x))
         first = False
-        for x in doc["alerts"]:
-            if x.get("symbol"):
-                try:
-                    src.series(x["symbol"], fresh=True)
-                except yahoo.DataError:
-                    pass
-        rang = evaluate(doc, src, clock, cal)
+        # A network blip (no internet, DNS, Yahoo down) must never stop the watch: time alerts
+        # (15:10 FLAT BY) still ring, price alerts wait for data, and it says so once.
+        failed = {}
+        for sym in sorted({x["symbol"] for x in doc["alerts"] if x.get("symbol") and not x.get("fired_at")}):
+            try:
+                src.series(sym, fresh=True)
+            except yahoo.DataError as e:
+                failed[sym] = str(e)
+        for sym in sorted(set(failed) - set(down)):
+            print("WARNING [%s] no fresh price for %s (%s). Price alerts for it are paused and retried "
+                  "every %d s; time alerts still ring. Watch your broker app." % (
+                      M.fmt_time(clock.now()), M.bare_symbol(sym), failed[sym], a.every))
+        for sym in sorted(set(down) - set(failed)):
+            print("OK [%s] prices for %s are back (down since %s)." % (M.fmt_time(clock.now()), M.bare_symbol(sym),
+                                                                      down[sym]))
+        down = {s: down.get(s, M.fmt_time(clock.now())) for s in failed}
+        try:
+            rang = evaluate(doc, src, clock, cal)
+        except yahoo.DataError as e:       # belt and braces: should not happen, never fatal
+            print("WARNING [%s] %s; retrying." % (M.fmt_time(clock.now()), e))
+            rang = []
         write_json(trader_path("alerts.json"), doc)
         ring(rang, a)
         any_rang = any_rang or bool(rang)

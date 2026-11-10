@@ -27,7 +27,7 @@ import market  # noqa: E402
 
 DEFAULTS = {
     "paper": True,                         # v1 is paper only; nothing here places orders
-    "capital_inr": 100000,                 # the money this is for: only money you can afford to lose
+    "capital_inr": 10000,                 # the money this is for: only money you can afford to lose
     "cash_buffer_pct": 10,                 # always left unused
     "max_position_pct": 50,                # one position at most this share of capital
     "max_order_inr": 50000,                # one order at most this much

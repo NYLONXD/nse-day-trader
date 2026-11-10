@@ -97,6 +97,31 @@ class PriceAlerts(Base):
         self.assertEqual(saved, {"first stock": "10:31", "second stock": "11:01", "below": None})
         self.assertEqual(out.count("first stock"), 1)                # rang once, kept rung after the re-read
 
+    def test_watch_survives_a_network_outage(self):
+        # Seen live on 2026-11-06: one "getaddrinfo failed" at 10:37 ended the watch, and the
+        # 15:10 FLAT BY alert never rang. Now the watch warns, keeps going and the time alerts ring.
+        real = yahoo.load_offline(PHASE0)["INFY.NS"]
+        calls = []
+
+        def flaky(sym, rng, interval):
+            calls.append(1)
+            if 2 <= len(calls) <= 4:
+                raise yahoo.DataError("Yahoo answered [Errno 11001] getaddrinfo failed for /v8/finance/chart/INFY.NS")
+            return real
+        self.al("add", "INFY", "below", "1000", offline=False)
+        self.al("add-time", "10:40", "--note", "FLAT BY test", offline=False)
+        old = yahoo.fetch_chart
+        yahoo.fetch_chart = flaky
+        try:
+            code, out = self.al("watch", "--every", "300", "--until", "11:00", offline=False)
+        finally:
+            yahoo.fetch_chart = old
+        self.assertIn("WARNING [10:21] no fresh price for INFY", out)
+        self.assertEqual(out.count("WARNING"), 1)                     # said once, not every loop
+        self.assertIn("OK [10:36] prices for INFY are back (down since 10:21)", out)
+        self.assertIn("10:40 IST (now 10:41): FLAT BY test", out)
+        self.assertIn("Stopped watching at 11:01", out)
+
     def test_duplicates_and_bad_input(self):
         self.al("add", "INFY", "below", "1150")
         code, out = self.al("add", "INFY", "below", "1150")
